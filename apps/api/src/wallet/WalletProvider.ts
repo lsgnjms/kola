@@ -49,6 +49,20 @@ export interface WalletProvider {
 
   /** Spendable balance across open channels. */
   getBalanceSat(): Promise<{ localSat: number; remoteSat: number }>;
+
+  /** Outgoing payments (including in-flight) created at or after `sinceMs`, newest first. */
+  listPayments(input: { sinceMs: number; limit: number }): Promise<WalletTransaction[]>;
+  /** Settled incoming invoices, newest first. */
+  listReceived(input: { limit: number }): Promise<WalletTransaction[]>;
+}
+
+export interface WalletTransaction {
+  direction: "in" | "out";
+  paymentHash: PaymentHashHex;
+  amountSat: number;
+  feeSat: number;
+  status: "pending" | "complete" | "failed";
+  timestampMs: number;
 }
 
 export type Network = "regtest" | "signet" | "testnet" | "mainnet";

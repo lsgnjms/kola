@@ -113,6 +113,18 @@ const PAYOUT_URIS = [
   "/lnrpc.Lightning/ChannelBalance",
 ];
 
+/** Member wallet (demo custody): receive, pay and read history on the member's own node only. */
+const MEMBER_WALLET_URIS = [
+  "/lnrpc.Lightning/AddInvoice",
+  "/lnrpc.Lightning/LookupInvoice",
+  "/lnrpc.Lightning/ListInvoices",
+  "/lnrpc.Lightning/DecodePayReq",
+  "/lnrpc.Lightning/ListPayments",
+  "/lnrpc.Lightning/ChannelBalance",
+  "/routerrpc.Router/SendPaymentV2",
+  "/routerrpc.Router/TrackPaymentV2",
+];
+
 function bakeMacaroon(node: string, name: string, uris: string[]): void {
   const path = `/root/.lnd/kola/${name}.macaroon`;
   exec(node, ["sh", "-c", `mkdir -p /root/.lnd/kola && rm -f ${path}`]);
@@ -181,6 +193,7 @@ async function main(): Promise<void> {
   console.log("Baking least-privilege coordinator macaroons…");
   bakeMacaroon(COORDINATOR, "invoice", INVOICE_URIS);
   bakeMacaroon(COORDINATOR, "payout", PAYOUT_URIS);
+  for (const m of MEMBERS) bakeMacaroon(m, "wallet", MEMBER_WALLET_URIS);
 
   // TODO(circle milestone): create the demo circle (3 members, cycle ready to open) via the API.
   console.log("Seed complete: nodes funded, channels active, macaroons in infra/data/coordinator/kola/.");

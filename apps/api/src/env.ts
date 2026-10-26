@@ -8,7 +8,27 @@ const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
 const RepoPath = z
   .string()
   .min(1)
-  .transform((p) => (isAbsolute(p) ? p : resolve(REPO_ROOT, p)));
+  .transform((p) => (p === ":memory:" || isAbsolute(p) ? p : resolve(REPO_ROOT, p)));
+
+/**
+ * "alice=https://localhost:8082,bob=…". Cert and macaroon paths follow the
+ * layout the regtest stack and seed script produce under infra/data/<name>/.
+ */
+const MemberNodes = z
+  .string()
+  .transform((s) => s.split(",").map((e) => e.trim()).filter(Boolean))
+  .pipe(z.array(z.string().regex(/^[a-z0-9-]+=https:\/\/\S+$/)))
+  .transform((entries) =>
+    entries.map((entry) => {
+      const [name = "", restUrl = ""] = entry.split("=");
+      return {
+        name,
+        restUrl,
+        tlsCertPath: resolve(REPO_ROOT, "infra/data", name, "tls.cert"),
+        macaroonPath: resolve(REPO_ROOT, "infra/data", name, "kola/wallet.macaroon"),
+      };
+    }),
+  );
 
 const Env = z.object({
   API_PORT: z.coerce.number().int().positive().default(3000),
@@ -21,6 +41,13 @@ const Env = z.object({
   MAX_PAYMENT_SAT: z.coerce.number().int().positive().default(100_000),
   MAX_DAILY_SPEND_SAT: z.coerce.number().int().positive().default(500_000),
   MAX_PAYOUT_FEE_SAT: z.coerce.number().int().nonnegative().default(50),
+  /** The API's URL as the browser sees it; NIP-98 events are signed over it. */
+  PUBLIC_API_URL: z.string().url().default("http://localhost:5173/api"),
+  BITCOIN_NETWORK: z.enum(["regtest", "signet", "testnet", "mainnet"]).default("regtest"),
+  DB_PATH: RepoPath.default("data/kola.sqlite"),
+  MEMBER_NODES: MemberNodes.default(
+    "alice=https://localhost:8082,bob=https://localhost:8083,carol=https://localhost:8084",
+  ),
   NOSTR_RELAY_URL: z.string().url().default("ws://localhost:7777"),
   COORDINATOR_LND_REST_URL: z.string().url().default("https://localhost:8081"),
   COORDINATOR_LND_TLS_CERT_PATH: RepoPath.default("infra/data/coordinator/tls.cert"),

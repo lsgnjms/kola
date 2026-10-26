@@ -40,7 +40,8 @@ Run `pnpm lint && pnpm typecheck && pnpm test` before considering a task done. R
 
 ## Architecture rules
 
-- **Money lives in Lightning, the record lives on Nostr.** SQLite is a cache/index only; it must be rebuildable from LND + the relay. Never treat a DB row as proof of payment.
+- **Money lives in Lightning, the record lives on Nostr.** SQLite is a cache/index only; it must be rebuildable from LND + the relay. Never treat a DB row as proof of payment. (One documented exception: demo `wallet_bindings`, pubkey → custodial regtest node.)
+- **API auth is NIP-98.** Member routes verify a per-request signed Nostr event (`nostrAuth` preHandler) and act only on the signer's own wallet. No passwords or sessions.
 - **Cycle engine is a state machine** (`open → collecting → settling → paying_out → paid_out`, or `collecting → cancelled`). All transitions go through one module; no route handler changes cycle state directly. Every transition publishes a Nostr event.
 - **Settle → pay recipient happens immediately** in the same job. Minimize time the coordinator holds funds.
 - **Hold invoice handling:** subscribe to invoice state updates rather than polling where possible. Always handle `ACCEPTED`, `SETTLED`, `CANCELED`, and expiry.

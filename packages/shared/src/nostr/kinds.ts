@@ -18,3 +18,9 @@ export const KIND = {
 } as const;
 
 export type KolaKind = (typeof KIND)[keyof typeof KIND];
+
+/** Standard kinds from other NIPs that Kola uses. */
+export const NIP_KIND = {
+  /** NIP-98 HTTP Auth. */
+  HTTP_AUTH: 27_235,
+} as const;

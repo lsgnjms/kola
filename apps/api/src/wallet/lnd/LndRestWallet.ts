@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { HoldInvoiceState, PaymentHashHex } from "@kola/shared";
 import { z } from "zod";
 import { networkFromBolt11 } from "../invoiceChecks.js";
-import type { DecodedInvoice, PaymentResult, WalletProvider } from "../WalletProvider.js";
+import type { DecodedInvoice, PaymentResult, WalletProvider, WalletTransaction } from "../WalletProvider.js";
 import { LndError, type HttpMethod, type LndTransport } from "./transport.js";
 
 /**
@@ -163,6 +163,39 @@ export class LndRestWallet implements WalletProvider {
     const res = ChannelBalanceResponse.parse(await this.payments.request("GET", "/v1/balance/channels"));
     return { localSat: res.local_balance.sat, remoteSat: res.remote_balance.sat };
   }
+
+  async listPayments(input: { sinceMs: number; limit: number }): Promise<WalletTransaction[]> {
+    const query = new URLSearchParams({
+      include_incomplete: "true",
+      reversed: "true",
+      max_payments: String(input.limit),
+      creation_date_start: String(Math.floor(input.sinceMs / 1000)),
+    });
+    const res = ListPaymentsResponse.parse(await this.payments.request("GET", `/v1/payments?${query}`));
+    return res.payments.map((p) => ({
+      direction: "out",
+      paymentHash: p.payment_hash,
+      amountSat: p.value_sat,
+      feeSat: p.fee_sat,
+      status: p.status === "SUCCEEDED" ? "complete" : p.status === "FAILED" ? "failed" : "pending",
+      timestampMs: p.creation_time_ns,
+    }));
+  }
+
+  async listReceived(input: { limit: number }): Promise<WalletTransaction[]> {
+    const query = new URLSearchParams({ reversed: "true", num_max_invoices: String(input.limit) });
+    const res = ListInvoicesResponse.parse(await this.invoices.request("GET", `/v1/invoices?${query}`));
+    return res.invoices
+      .filter((i) => i.state === "SETTLED")
+      .map((i) => ({
+        direction: "in",
+        paymentHash: PaymentHashHex.parse(Buffer.from(i.r_hash, "base64").toString("hex")),
+        amountSat: i.amt_paid_sat,
+        feeSat: 0,
+        status: "complete",
+        timestampMs: i.settle_date * 1000,
+      }));
+  }
 }
 
 /** Resolves with the first stream message matching `accept`, or null if the stream ends first. */
@@ -242,6 +275,39 @@ const PaymentUpdate = z.object({
   status: z.enum(["UNKNOWN", "IN_FLIGHT", "SUCCEEDED", "FAILED", "INITIATED"]),
   fee_sat: Int.default(0),
   failure_reason: z.string().default("FAILURE_REASON_NONE"),
+});
+
+/** Nanosecond timestamps exceed Number.MAX_SAFE_INTEGER; truncate to ms on the string. */
+const NsToMs = z
+  .string()
+  .regex(/^\d+$/)
+  .transform((ns) => (ns.length > 6 ? Number(ns.slice(0, -6)) : 0));
+
+const ListPaymentsResponse = z.object({
+  payments: z
+    .array(
+      z.object({
+        payment_hash: PaymentHashHex,
+        value_sat: Int.default(0),
+        fee_sat: Int.default(0),
+        status: z.enum(["UNKNOWN", "IN_FLIGHT", "SUCCEEDED", "FAILED", "INITIATED"]),
+        creation_time_ns: NsToMs,
+      }),
+    )
+    .default([]),
+});
+
+const ListInvoicesResponse = z.object({
+  invoices: z
+    .array(
+      z.object({
+        r_hash: z.string(),
+        amt_paid_sat: Int.default(0),
+        state: HoldInvoiceState.default("OPEN"),
+        settle_date: Int.default(0),
+      }),
+    )
+    .default([]),
 });
 
 const ChannelBalanceResponse = z.object({

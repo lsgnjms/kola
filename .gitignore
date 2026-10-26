@@ -19,3 +19,6 @@ infra/data/
 *.sqlite
 *.sqlite-journal
 *.db
+*.sqlite-wal
+*.sqlite-shm
+/data/

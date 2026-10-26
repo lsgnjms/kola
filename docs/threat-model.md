@@ -24,7 +24,43 @@ The coordinator never uses LND's `admin.macaroon`. `pnpm seed` bakes two
 | `invoice.macaroon` | AddHoldInvoice, SettleInvoice, CancelInvoice, SubscribeSingleInvoice, LookupInvoice, AddInvoice | Send any payment |
 | `payout.macaroon` | DecodePayReq, SendPaymentV2, TrackPaymentV2, ChannelBalance | Open/close channels, spend on-chain, create or settle invoices |
 
+Each demo member node gets a `wallet.macaroon` scoped to AddInvoice,
+LookupInvoice, ListInvoices, DecodePayReq, ListPayments, ChannelBalance,
+SendPaymentV2 and TrackPaymentV2 on **that member's own node** only.
+
 LND's TLS certificate is pinned as the only trusted CA for REST calls.
+
+## Authentication (wallet routes)
+
+Every `/wallet/*` route requires a **NIP-98** signed request: the member's
+on-device Nostr key signs the exact URL, method and sha256 of the body. The
+server verifies the signature and acts only on the wallet bound to that pubkey.
+
+- No passwords or sessions to steal; the server never sees member private keys.
+- Events older/newer than 60 s are rejected; each signature is accepted once
+  (replay cache keyed on the randomized BIP-340 signature).
+- Pubkey → demo node bindings live in SQLite (`wallet_bindings`). This is the one
+  table that is **not** rebuildable from LND + relay; it exists only because demo
+  wallets are custodial and disappears with NWC.
+
+## Routes
+
+| Route | Auth | Limits | Notes |
+|---|---|---|---|
+| `GET /health` | none | global 100/min | Reveals only whether AI is enabled |
+| `POST /wallet/claim` | NIP-98 | global | Binds a free demo node; 409 when none left |
+| `GET /wallet/balance` | NIP-98 | global | |
+| `POST /wallet/invoices` | NIP-98 | global; amount ≤ `MAX_PAYMENT_SAT` | Fixed memo (no user text in invoices) |
+| `POST /wallet/decode` | NIP-98 | global | Preview before paying |
+| `POST /wallet/pay` | NIP-98 | 10/min; per-payment + 24h caps | See below |
+| `GET /wallet/history` | NIP-98 | global | Payment hashes are not returned |
+
+`/wallet/pay` decodes via LND, checks network / amount / expiry, then enforces
+`MAX_PAYMENT_SAT` and `MAX_DAILY_SPEND_SAT`. The 24h total is computed from
+**LND's own payment history** (in-flight included, worst-case fee counted), so
+caps survive API restarts. Payments are serialized per member so two concurrent
+requests can't both slip under the cap. Every error response says whether money
+moved (`moneyMoved: false`, or `null` when contact with the node was lost mid-payment).
 
 **Residual risk:** whoever holds `payout.macaroon` can drain the coordinator's
 channel balance via Lightning payments. Mitigations: per-payment and per-day spend
@@ -58,4 +94,6 @@ caps in the API, payout invoices must equal the pot exactly
 | Prompt injection into AI assistant | Read-only tools, no keys/invoices/preimages in context, untrusted-input framing | Pending |
 | Relay censorship / tampering | Events are signed; clients verify; state rebuildable from LND + relay | Pending |
 | Stolen phone | Nostr key encrypted with PIN-derived key; no spending key on device in demo | Pending |
-| API abuse | Global rate limit, 64 KB body limit, Zod on every route | Partial (routes pending) |
+| API abuse | Global rate limit (stricter on pay), 64 KB body limit, strict Zod bodies, generic error codes (no internals leaked) | Implemented for wallet routes |
+| Someone else spends a member's wallet | NIP-98 signature per request, bound to URL/method/body; replay cache | Implemented |
+| Stolen API database | Holds only pubkey → node bindings; no keys, invoices or balances | Implemented |
