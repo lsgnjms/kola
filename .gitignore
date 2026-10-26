@@ -1,0 +1,21 @@
+node_modules/
+dist/
+coverage/
+*.log
+
+# Secrets: never commit
+.env
+.env.*
+!.env.example
+*.macaroon
+*.cert
+*.pem
+tls.key
+
+# Regtest node data (wallets, macaroons, channel state)
+infra/data/
+
+# Local SQLite cache
+*.sqlite
+*.sqlite-journal
+*.db
