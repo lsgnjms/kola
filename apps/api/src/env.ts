@@ -1,4 +1,14 @@
+import { isAbsolute, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
+
+const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
+
+/** File paths in .env are relative to the repo root, whatever the process cwd. */
+const RepoPath = z
+  .string()
+  .min(1)
+  .transform((p) => (isAbsolute(p) ? p : resolve(REPO_ROOT, p)));
 
 const Env = z.object({
   API_PORT: z.coerce.number().int().positive().default(3000),
@@ -12,6 +22,10 @@ const Env = z.object({
   MAX_DAILY_SPEND_SAT: z.coerce.number().int().positive().default(500_000),
   MAX_PAYOUT_FEE_SAT: z.coerce.number().int().nonnegative().default(50),
   NOSTR_RELAY_URL: z.string().url().default("ws://localhost:7777"),
+  COORDINATOR_LND_REST_URL: z.string().url().default("https://localhost:8081"),
+  COORDINATOR_LND_TLS_CERT_PATH: RepoPath.default("infra/data/coordinator/tls.cert"),
+  COORDINATOR_INVOICE_MACAROON_PATH: RepoPath.default("infra/data/coordinator/kola/invoice.macaroon"),
+  COORDINATOR_PAYOUT_MACAROON_PATH: RepoPath.default("infra/data/coordinator/kola/payout.macaroon"),
   // Optional: without it the assistant uses templated answers.
   ANTHROPIC_API_KEY: z
     .string()

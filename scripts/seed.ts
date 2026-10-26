@@ -95,6 +95,31 @@ function openChannel(from: string, to: string, toPubkey: string): void {
   console.log(`  ${from} → ${to}: opening ${CHANNEL_SAT} sat`);
 }
 
+/** Receiving side: can create and resolve invoices, cannot send money. */
+const INVOICE_URIS = [
+  "/invoicesrpc.Invoices/AddHoldInvoice",
+  "/invoicesrpc.Invoices/SettleInvoice",
+  "/invoicesrpc.Invoices/CancelInvoice",
+  "/invoicesrpc.Invoices/SubscribeSingleInvoice",
+  "/lnrpc.Lightning/LookupInvoice",
+  "/lnrpc.Lightning/AddInvoice",
+];
+
+/** Payout side: can pay invoices, cannot open/close channels or spend on-chain. */
+const PAYOUT_URIS = [
+  "/lnrpc.Lightning/DecodePayReq",
+  "/routerrpc.Router/SendPaymentV2",
+  "/routerrpc.Router/TrackPaymentV2",
+  "/lnrpc.Lightning/ChannelBalance",
+];
+
+function bakeMacaroon(node: string, name: string, uris: string[]): void {
+  const path = `/root/.lnd/kola/${name}.macaroon`;
+  exec(node, ["sh", "-c", `mkdir -p /root/.lnd/kola && rm -f ${path}`]);
+  exec(node, ["lncli", "--network=regtest", "bakemacaroon", `--save_to=${path}`, ...uris.map((u) => `uri:${u}`)]);
+  console.log(`  ${node}/${name}.macaroon: ${uris.length} methods`);
+}
+
 async function main(): Promise<void> {
   const nodes = [COORDINATOR, ...MEMBERS];
 
@@ -153,8 +178,12 @@ async function main(): Promise<void> {
     });
   }
 
+  console.log("Baking least-privilege coordinator macaroons…");
+  bakeMacaroon(COORDINATOR, "invoice", INVOICE_URIS);
+  bakeMacaroon(COORDINATOR, "payout", PAYOUT_URIS);
+
   // TODO(circle milestone): create the demo circle (3 members, cycle ready to open) via the API.
-  console.log("Seed complete: nodes funded, channels active.");
+  console.log("Seed complete: nodes funded, channels active, macaroons in infra/data/coordinator/kola/.");
 }
 
 main().catch((err: unknown) => {
