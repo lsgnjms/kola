@@ -242,8 +242,12 @@ function hexToBase64(hex: string): string {
   return Buffer.from(hex, "hex").toString("base64");
 }
 
+/**
+ * Bytes in LND REST path params: URL-safe base64 *with* padding (Go's
+ * base64.URLEncoding). Node's "base64url" omits the padding, which LND rejects.
+ */
 function hexToBase64Url(hex: string): string {
-  return Buffer.from(hex, "hex").toString("base64url");
+  return Buffer.from(hex, "hex").toString("base64").replace(/\+/g, "-").replace(/\//g, "_");
 }
 
 function sha256Hex(hex: string): PaymentHashHex {

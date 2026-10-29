@@ -84,28 +84,48 @@ export class HttpsLndTransport implements LndTransport {
   ): () => void {
     let closed = false;
     const req = this.open(method, path, (res) => {
+      const status = res.statusCode ?? 0;
+      const ok = status >= 200 && status < 300;
+      let failed = false;
       let buffer = "";
+
+      const fail = (err: Error) => {
+        if (closed || failed) return;
+        failed = true;
+        handlers.onError(err);
+      };
+      const handleLine = (line: string) => {
+        if (!line || failed) return;
+        let msg: unknown;
+        try {
+          msg = JSON.parse(line);
+        } catch {
+          fail(new LndError(status, "LND stream returned invalid JSON"));
+          return;
+        }
+        // Non-2xx responses carry a bare `{code, message}` body, not a stream frame.
+        if (!ok) return fail(new LndError(status, lndMessage(msg)));
+        const frame = msg as { result?: unknown; error?: unknown };
+        if (frame.error !== undefined) fail(new LndError(status, lndMessage(frame.error)));
+        else if (!closed) handlers.onMessage(frame.result);
+      };
+
       res.setEncoding("utf8");
       res.on("data", (chunk: string) => {
         buffer += chunk;
         let newline: number;
         while ((newline = buffer.indexOf("\n")) !== -1) {
-          const line = buffer.slice(0, newline).trim();
+          handleLine(buffer.slice(0, newline).trim());
           buffer = buffer.slice(newline + 1);
-          if (!line) continue;
-          let msg: { result?: unknown; error?: unknown };
-          try {
-            msg = JSON.parse(line) as { result?: unknown; error?: unknown };
-          } catch {
-            handlers.onError(new LndError(res.statusCode ?? 0, "LND stream returned invalid JSON"));
-            continue;
-          }
-          if (msg.error !== undefined) handlers.onError(new LndError(res.statusCode ?? 0, lndMessage(msg.error)));
-          else handlers.onMessage(msg.result);
         }
       });
       res.on("end", () => {
-        if (!closed) handlers.onEnd();
+        // The last frame (or an error body) may not end with a newline.
+        handleLine(buffer.trim());
+        if (closed || failed) return;
+        // An error status must never look like a clean end: callers read "ended" as "no result".
+        if (!ok) fail(new LndError(status, "LND request failed"));
+        else handlers.onEnd();
       });
       res.on("error", (err) => {
         if (!closed) handlers.onError(err);
@@ -138,9 +158,11 @@ export class HttpsLndTransport implements LndTransport {
   }
 }
 
+/** LND errors are `{code, message}`, sometimes wrapped as `{error: {code, message}}`. */
 function lndMessage(json: unknown): string {
-  if (json && typeof json === "object" && "message" in json && typeof json.message === "string") {
-    return json.message;
+  if (json && typeof json === "object") {
+    if ("message" in json && typeof json.message === "string") return json.message;
+    if ("error" in json) return lndMessage(json.error);
   }
   return "LND request failed";
 }

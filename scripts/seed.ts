@@ -65,13 +65,16 @@ function pubkey(node: string): string {
   return lncli<{ identity_pubkey: string }>(node, "getinfo").identity_pubkey;
 }
 
+/** True if `node` itself opened a channel to `peer`. A channel the peer opened doesn't count: direction matters for liquidity. */
 function hasChannelTo(node: string, peer: string): boolean {
-  const open = lncli<{ channels: { remote_pubkey: string }[] }>(node, "listchannels").channels;
-  const pending = lncli<{ pending_open_channels: { channel: { remote_node_pub: string } }[] }>(
-    node,
-    "pendingchannels",
-  ).pending_open_channels;
-  return open.some((c) => c.remote_pubkey === peer) || pending.some((p) => p.channel.remote_node_pub === peer);
+  const open = lncli<{ channels: { remote_pubkey: string; initiator: boolean }[] }>(node, "listchannels").channels;
+  const pending = lncli<{
+    pending_open_channels: { channel: { remote_node_pub: string; initiator: string } }[];
+  }>(node, "pendingchannels").pending_open_channels;
+  return (
+    open.some((c) => c.remote_pubkey === peer && c.initiator) ||
+    pending.some((p) => p.channel.remote_node_pub === peer && p.channel.initiator === "INITIATOR_LOCAL")
+  );
 }
 
 function fund(node: string, utxos: number): void {

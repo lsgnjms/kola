@@ -45,7 +45,8 @@ class FakeTransport implements LndTransport {
 const PREIMAGE = "11".repeat(32);
 const HASH = createHash("sha256").update(Buffer.from(PREIMAGE, "hex")).digest("hex");
 const HASH_B64 = Buffer.from(HASH, "hex").toString("base64");
-const HASH_B64URL = Buffer.from(HASH, "hex").toString("base64url");
+// LND wants URL-safe base64 WITH padding in paths (verified against LND 0.18 REST).
+const HASH_B64URL = `${Buffer.from(HASH, "hex").toString("base64url")}=`;
 const PAYREQ = "lnbcrt10u1pexample";
 
 const fail = () => {
