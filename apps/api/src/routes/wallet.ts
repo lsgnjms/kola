@@ -1,18 +1,19 @@
-import type { PubkeyHex } from "@kola/shared";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { z } from "zod";
-import { nostrAuth } from "../auth/nostrAuth.js";
+import { memberPubkey, nostrAuth } from "../auth/nostrAuth.js";
 import type { Env } from "../env.js";
 import type { WalletBindings } from "../wallet/bindings.js";
 import { WalletUnavailableError, type MemberWallets } from "../wallet/memberWallets.js";
 import { payFromWallet, type PayError } from "../wallet/pay.js";
-import { KeyedMutex } from "../wallet/spendCaps.js";
+import type { KeyedMutex } from "../wallet/spendCaps.js";
 import type { WalletProvider } from "../wallet/WalletProvider.js";
 
 export interface WalletRouteDeps {
   env: Env;
   bindings: WalletBindings;
   wallets: MemberWallets;
+  /** Shared with circle contributions: one payment at a time per member, so caps can't be raced. */
+  payLock: KeyedMutex;
   nowMs: () => number;
 }
 
@@ -21,7 +22,7 @@ const HISTORY_LIMIT = 50;
 /** Fixed memo: user-supplied memos could leak PII into shared invoices. */
 const INVOICE_MEMO = "Kola";
 
-const PAY_ERROR_STATUS: Record<PayError, number> = {
+export const PAY_ERROR_STATUS: Record<PayError, number> = {
   invalid_invoice: 400,
   wrong_network: 400,
   no_amount: 400,
@@ -38,20 +39,19 @@ const PAY_ERROR_STATUS: Record<PayError, number> = {
  * so the UI can tell the member plainly.
  */
 export async function walletRoutes(app: FastifyInstance, deps: WalletRouteDeps): Promise<void> {
-  const payLock = new KeyedMutex();
   app.addHook(
     "preHandler",
     nostrAuth({ publicApiUrls: deps.env.PUBLIC_API_URLS, nowS: () => Math.floor(deps.nowMs() / 1000) }),
   );
 
   app.post("/wallet/claim", async (request, reply) => {
-    const node = deps.bindings.claim(pubkeyOf(request), deps.nowMs());
+    const node = deps.bindings.claim(memberPubkey(request), deps.nowMs());
     if (!node) return reply.code(409).send({ error: "no_wallet_available" });
     return { ready: true };
   });
 
   app.get("/wallet/balance", async (request, reply) => {
-    const wallet = await walletFor(request, reply);
+    const wallet = await walletFor(deps, request, reply);
     if (!wallet) return;
     const { localSat } = await wallet.getBalanceSat();
     return { balanceSat: localSat };
@@ -61,7 +61,7 @@ export async function walletRoutes(app: FastifyInstance, deps: WalletRouteDeps):
   app.post("/wallet/invoices", async (request, reply) => {
     const body = CreateInvoice.safeParse(request.body);
     if (!body.success) return reply.code(400).send({ error: "invalid_request" });
-    const wallet = await walletFor(request, reply);
+    const wallet = await walletFor(deps, request, reply);
     if (!wallet) return;
     const invoice = await wallet.createInvoice({
       amountSat: body.data.amountSat,
@@ -77,7 +77,7 @@ export async function walletRoutes(app: FastifyInstance, deps: WalletRouteDeps):
   app.post("/wallet/decode", async (request, reply) => {
     const body = PaymentRequestBody.safeParse(request.body);
     if (!body.success) return reply.code(400).send({ error: "invalid_request" });
-    const wallet = await walletFor(request, reply);
+    const wallet = await walletFor(deps, request, reply);
     if (!wallet) return;
     try {
       const d = await wallet.decodeInvoice(body.data.paymentRequest);
@@ -94,12 +94,12 @@ export async function walletRoutes(app: FastifyInstance, deps: WalletRouteDeps):
     async (request, reply) => {
       const body = PaymentRequestBody.safeParse(request.body);
       if (!body.success) return reply.code(400).send({ error: "invalid_request", moneyMoved: false });
-      const pubkey = pubkeyOf(request);
-      const wallet = await walletFor(request, reply);
+      const pubkey = memberPubkey(request);
+      const wallet = await walletFor(deps, request, reply);
       if (!wallet) return;
 
       try {
-        const outcome = await payLock.run(pubkey, () =>
+        const outcome = await deps.payLock.run(pubkey, () =>
           payFromWallet(wallet, body.data.paymentRequest, {
             network: deps.env.BITCOIN_NETWORK,
             nowMs: deps.nowMs(),
@@ -117,7 +117,7 @@ export async function walletRoutes(app: FastifyInstance, deps: WalletRouteDeps):
   );
 
   app.get("/wallet/history", async (request, reply) => {
-    const wallet = await walletFor(request, reply);
+    const wallet = await walletFor(deps, request, reply);
     if (!wallet) return;
     const [sent, received] = await Promise.all([
       wallet.listPayments({ sinceMs: 0, limit: HISTORY_LIMIT }),
@@ -135,25 +135,25 @@ export async function walletRoutes(app: FastifyInstance, deps: WalletRouteDeps):
       }));
     return { transactions };
   });
+}
 
-  async function walletFor(request: FastifyRequest, reply: FastifyReply): Promise<WalletProvider | null> {
-    const node = deps.bindings.nodeFor(pubkeyOf(request));
-    if (!node) {
-      await reply.code(404).send({ error: "no_wallet" });
-      return null;
-    }
-    try {
-      return await deps.wallets.get(node);
-    } catch (err) {
-      if (!(err instanceof WalletUnavailableError)) throw err;
-      await reply.code(503).send({ error: "wallet_unavailable", moneyMoved: false });
-      return null;
-    }
+/** The caller's bound wallet, or replies with no_wallet / wallet_unavailable and returns null. */
+export async function walletFor(
+  deps: Pick<WalletRouteDeps, "bindings" | "wallets">,
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<WalletProvider | null> {
+  const node = deps.bindings.nodeFor(memberPubkey(request));
+  if (!node) {
+    await reply.code(404).send({ error: "no_wallet" });
+    return null;
+  }
+  try {
+    return await deps.wallets.get(node);
+  } catch (err) {
+    if (!(err instanceof WalletUnavailableError)) throw err;
+    await reply.code(503).send({ error: "wallet_unavailable", moneyMoved: false });
+    return null;
   }
 }
 
-function pubkeyOf(request: FastifyRequest): PubkeyHex {
-  // nostrAuth runs as a preHandler on every route here and rejects otherwise.
-  if (!request.memberPubkey) throw new Error("nostrAuth did not run");
-  return request.memberPubkey;
-}

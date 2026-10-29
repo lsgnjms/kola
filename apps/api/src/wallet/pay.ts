@@ -20,16 +20,28 @@ const MIN_REMAINING_MS = 30_000;
 const PAY_TIMEOUT_S = 60;
 const HISTORY_LIMIT = 1000;
 
+export interface PayContext {
+  network: Network;
+  nowMs: number;
+  caps: SpendCaps;
+  /** When set (e.g. a circle contribution), the invoice must be for exactly this amount. */
+  expectedAmountSat?: number;
+}
+
+export type PreparedPayment =
+  | { ok: true; paymentRequest: string; paymentHash: string; amountSat: number; maxFeeSat: number }
+  | { ok: false; error: PayError };
+
 /**
- * Pays an invoice from a member's wallet: decode via LND, check network /
- * amount / expiry, enforce spend caps from LND's own history, then pay.
- * Callers must serialize calls per wallet (KeyedMutex) so caps can't be raced.
+ * Every check before money leaves a member's wallet: decode via LND, check
+ * network / amount / expiry, enforce spend caps from LND's own history.
+ * Callers must serialize per wallet (KeyedMutex) so caps can't be raced.
  */
-export async function payFromWallet(
+export async function preparePayment(
   wallet: WalletProvider,
   paymentRequest: string,
-  ctx: { network: Network; nowMs: number; caps: SpendCaps },
-): Promise<PayOutcome> {
+  ctx: PayContext,
+): Promise<PreparedPayment> {
   let decoded;
   try {
     decoded = await wallet.decodeInvoice(paymentRequest);
@@ -42,6 +54,7 @@ export async function payFromWallet(
     nowMs: ctx.nowMs,
     maxAmountSat: ctx.caps.maxPaymentSat,
     minRemainingMs: MIN_REMAINING_MS,
+    ...(ctx.expectedAmountSat !== undefined ? { expectedAmountSat: ctx.expectedAmountSat } : {}),
   });
   if (!check.ok) return { ok: false, error: check.reason === "over_limit" ? "over_payment_cap" : check.reason };
 
@@ -56,17 +69,30 @@ export async function payFromWallet(
   });
   if (!spend.ok) return { ok: false, error: spend.reason };
 
+  return { ok: true, paymentRequest, paymentHash: decoded.paymentHash, amountSat: decoded.amountSat, maxFeeSat };
+}
+
+/** Checks, then pays and waits for the result. */
+export async function payFromWallet(
+  wallet: WalletProvider,
+  paymentRequest: string,
+  ctx: PayContext,
+): Promise<PayOutcome> {
+  const prepared = await preparePayment(wallet, paymentRequest, ctx);
+  if (!prepared.ok) return prepared;
+  const { paymentHash, maxFeeSat } = prepared;
+
   const result = await wallet.payInvoice({
     paymentRequest,
-    paymentHash: decoded.paymentHash,
+    paymentHash,
     maxFeeSat,
     timeoutSeconds: PAY_TIMEOUT_S,
   });
   switch (result.status) {
     case "succeeded":
-      return { ok: true, status: "succeeded", amountSat: decoded.amountSat, feeSat: result.feeSat };
+      return { ok: true, status: "succeeded", amountSat: prepared.amountSat, feeSat: result.feeSat };
     case "in_flight":
-      return { ok: true, status: "in_flight", amountSat: decoded.amountSat, feeSat: 0 };
+      return { ok: true, status: "in_flight", amountSat: prepared.amountSat, feeSat: 0 };
     case "failed":
       return { ok: false, error: "payment_failed" };
   }

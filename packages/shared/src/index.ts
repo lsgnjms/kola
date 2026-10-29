@@ -5,3 +5,4 @@ export * from "./cycle.js";
 export * from "./nostr/kinds.js";
 export * from "./nostr/httpAuth.js";
 export * from "./api/wallet.js";
+export * from "./api/circles.js";

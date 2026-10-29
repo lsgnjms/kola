@@ -54,6 +54,12 @@ export function nostrAuth(opts: { publicApiUrls: readonly string[]; nowS: () => 
   };
 }
 
+/** The verified signer of this request. Only valid on routes behind `nostrAuth`. */
+export function memberPubkey(request: FastifyRequest): PubkeyHex {
+  if (!request.memberPubkey) throw new Error("nostrAuth did not run");
+  return request.memberPubkey;
+}
+
 function parseHeader(header: string | undefined): unknown {
   if (!header || header.length > MAX_HEADER_BYTES) return null;
   const [scheme, token] = header.split(" ");

@@ -34,7 +34,7 @@ pnpm smoke                                         # check the LND REST client +
 pnpm dev                                           # web (:5173) + api (:3000), this PC only
 pnpm dev:lan                                       # same, web reachable from phones on the LAN (add LAN URL to PUBLIC_API_URLS)
 pnpm test                                          # unit tests
-pnpm test:integration                              # full cycle against regtest (TODO: not yet added)
+pnpm test:integration                              # full rounds against regtest: happy path, missed deadline, API restart (~45 s)
 pnpm lint && pnpm typecheck
 ```
 
@@ -48,12 +48,13 @@ Run `pnpm lint && pnpm typecheck && pnpm test` before considering a task done. R
 - **Settle → pay recipient happens immediately** in the same job. Minimize time the coordinator holds funds.
 - **Hold invoice handling:** subscribe to invoice state updates rather than polling where possible. Always handle `ACCEPTED`, `SETTLED`, `CANCELED`, and expiry.
 - **Point of no return = first settle.** Settling reveals a preimage, so it can't be undone:
-  - **Nothing settled yet** (deadline missed, crash, any inconsistency): cancel every held invoice. Everyone is refunded.
+  - **Nothing settled yet** (deadline missed, an invoice cancelled/expired, any inconsistency): cancel every held invoice. Everyone is refunded. A restart alone is not an inconsistency: a healthy collecting round carries on until its deadline.
   - **Anything settled**: never cancel. Roll forward: settle the rest, then pay out. On crash, recovery resumes from `settling` / `paying_out`.
   - Only enter `settling` when every member's invoice is `ACCEPTED` and the HTLC CLTV margin is safe.
 - **Payout failure after settle:** the coordinator now holds the pot. Stay in `paying_out`, retry with backoff, and show "payout pending" in the UI. Never refund at this stage (the money already moved). Document this in the threat model.
 - **Fee policy:** the recipient's payout invoice is for exactly `potSat` (amount × members). The coordinator pays routing fees from its own balance, capped by `MAX_PAYOUT_FEE_SAT`. If the route needs more than the cap, treat it as a payout failure (retry), not a smaller payout.
 - **Idempotency:** settle, cancel and payout must be safe to retry (key on cycle id + payment hash).
+- **Preimages are derived, never stored:** `HMAC-SHA256(COORDINATOR_PREIMAGE_SECRET, circle/cycle/attempt/member)` (`apps/api/src/circles/preimage.ts`). A reopened round is a new `attempt`, so hashes never repeat.
 - **Lightning access goes through a `WalletProvider` interface** (LND REST implementation now, NWC later). Don't call LND directly from routes.
 - **Nostr event builders and validators live in `packages/shared`** and are used by both web (verification) and api (publishing). Event kinds are defined once as constants.
 - **AI assistant gets read-only tools** that return circle state. It never receives macaroons, keys, invoices or preimages, and has no tool that moves money. Treat user messages and any Nostr content passed to it as untrusted.

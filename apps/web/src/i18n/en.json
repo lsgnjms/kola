@@ -2,7 +2,6 @@
   "app.name": "Kola",
   "app.tagline": "Save together. Everyone pays, or everyone gets their money back.",
   "app.language": "Language",
-
   "common.continue": "Continue",
   "common.back": "Back",
   "common.done": "Done",
@@ -11,26 +10,21 @@
   "common.copied": "Copied",
   "common.sats": "{amount} sats",
   "common.loading": "Loading…",
-
   "onboarding.title": "Welcome to Kola",
   "onboarding.body": "Save with your group. Everyone pays their share, or everyone gets their money back.",
   "onboarding.start": "Get started",
-
   "pin.label": "PIN",
   "pin.createTitle": "Choose a 6-digit PIN",
   "pin.createHelp": "You will use it to open Kola on this phone. Nobody can recover it for you, so pick one you will remember.",
   "pin.confirmTitle": "Enter your PIN again",
   "pin.mismatch": "The two PINs are different. Please start again.",
   "pin.invalid": "Your PIN must be exactly 6 digits.",
-
   "setup.working": "Setting up your wallet…",
-
   "unlock.title": "Enter your PIN",
   "unlock.button": "Open",
   "unlock.wrong": "That PIN is not right.",
   "unlock.wait": "Too many tries. Please wait {seconds} seconds.",
   "unlock.checking": "Checking…",
-
   "home.balance": "Your balance",
   "home.receive": "Receive",
   "home.pay": "Pay",
@@ -38,20 +32,17 @@
   "home.empty": "No payments yet.",
   "home.lock": "Lock",
   "home.refresh": "Refresh",
-
   "history.in": "Received",
   "history.out": "Sent",
   "history.pending": "On its way",
   "history.failed": "Did not go through",
   "history.fee": "Fee {amount} sats",
-
   "receive.title": "Receive money",
   "receive.amountLabel": "Amount in sats",
   "receive.create": "Create payment request",
   "receive.show": "Show this code to the person paying you, or copy it and send it to them.",
   "receive.expires": "This request works for {minutes} minutes.",
   "receive.qrLabel": "Payment request QR code",
-
   "pay.title": "Pay",
   "pay.pasteLabel": "Paste the payment request",
   "pay.check": "Check amount",
@@ -63,7 +54,6 @@
   "pay.successFee": "Network fee: {amount} sats",
   "pay.inFlightTitle": "Payment on its way",
   "pay.inFlight": "Your payment is still being delivered. Check your activity in a minute before trying again.",
-
   "errors.title": "Something went wrong",
   "errors.moneyStill": "Your money is still in your wallet.",
   "errors.moneyUnknown": "We could not confirm whether the payment went through. Check your activity before you try again.",
@@ -83,5 +73,13 @@
   "errors.over_daily_cap": "This would go over today's spending limit.",
   "errors.payment_failed": "The payment did not go through.",
   "errors.payment_status_unknown": "We lost contact with your wallet during the payment.",
-  "errors.network": "No connection. Check your internet and try again."
+  "errors.network": "No connection. Check your internet and try again.",
+  "errors.circle_not_found": "We could not find that circle. Check the code and try again.",
+  "errors.not_a_member": "You are not a member of this circle.",
+  "errors.not_creator": "Only the person who created the circle can do this.",
+  "errors.circle_full": "This circle is already full.",
+  "errors.circle_not_ready": "The circle is still waiting for members to join.",
+  "errors.cycle_in_progress": "A round is already in progress.",
+  "errors.circle_complete": "Everyone in this circle has already received the pot.",
+  "errors.no_open_cycle": "There is no round to pay into right now."
 }

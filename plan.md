@@ -36,7 +36,7 @@ One circle = ~10 members × 52 weekly contributions = 520 payments/year. A singl
 - [x] Docker Compose regtest stack: bitcoind + coordinator LND + 3 member LND nodes + Nostr relay, with channels opened and funded by a seed script
 - [x] Wallet: balance, create invoice (QR + copy), pay invoice, transaction history
 - [ ] Circle: create (name, amount in sats, period, member count), invite via link/code, join, fixed rotation order
-- [ ] Cycle engine: open cycle → issue hold invoices → track HTLCs → settle all + pay recipient, or cancel all on deadline
+- [x] Cycle engine: open cycle → issue hold invoices → track HTLCs → settle all + pay recipient, or cancel all on deadline
 - [ ] Nostr: publish circle, join, contribution, payout and cancellation events; in-app audit log that verifies signatures
 - [ ] AI: Q&A over circle state + generated reminder messages
 - [ ] One-command setup, seed data, a demo circle that completes a full rotation in minutes

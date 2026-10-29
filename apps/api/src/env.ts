@@ -52,6 +52,17 @@ const Env = z.object({
   MEMBER_NODES: MemberNodes.default(
     "alice=https://localhost:8082,bob=https://localhost:8083,carol=https://localhost:8084",
   ),
+  /** How long members have to pay their share once a round opens (demo: minutes; production ≤ 24h). */
+  CONTRIBUTION_WINDOW_SECONDS: z.coerce.number().int().min(30).max(24 * 3600).default(300),
+  /**
+   * 32-byte hex key that hold-invoice preimages are derived from. If unset, one is
+   * generated next to the database on first start. Never log or commit it.
+   */
+  COORDINATOR_PREIMAGE_SECRET: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/)
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
   NOSTR_RELAY_URL: z.string().url().default("ws://localhost:7777"),
   COORDINATOR_LND_REST_URL: z.string().url().default("https://localhost:8081"),
   COORDINATOR_LND_TLS_CERT_PATH: RepoPath.default("infra/data/coordinator/tls.cert"),

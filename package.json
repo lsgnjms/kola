@@ -15,7 +15,8 @@
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint .",
     "seed": "tsx scripts/seed.ts",
-    "smoke": "tsx scripts/smoke-lnd.ts"
+    "smoke": "tsx scripts/smoke-lnd.ts",
+    "test:integration": "pnpm --filter @kola/api test:integration"
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",

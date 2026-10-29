@@ -22,6 +22,14 @@ export const ApiErrorCode = z.enum([
   "over_daily_cap",
   "payment_failed",
   "payment_status_unknown",
+  "circle_not_found",
+  "not_a_member",
+  "not_creator",
+  "circle_full",
+  "circle_not_ready",
+  "cycle_in_progress",
+  "circle_complete",
+  "no_open_cycle",
 ]);
 export type ApiErrorCode = z.infer<typeof ApiErrorCode>;
 

@@ -80,6 +80,32 @@ wallet; with NWC/mainnet we would add a longer passphrase option and key backup.
 | `POST /wallet/decode` | NIP-98 | global | Preview before paying |
 | `POST /wallet/pay` | NIP-98 | 10/min; per-payment + 24h caps | See below |
 | `GET /wallet/history` | NIP-98 | global | Payment hashes are not returned |
+| `POST /circles` | NIP-98 | global; contribution ≤ `MAX_PAYMENT_SAT` | Creator joins as position 0 |
+| `POST /circles/join` | NIP-98 | global | 6-char code (32-symbol alphabet); idempotent; full circles refuse |
+| `GET /circles`, `GET /circles/:id` | NIP-98 | global | Members only; others get 404 so ids don't reveal circles |
+| `POST /circles/:id/cycles` | NIP-98, creator only | global | Opens the next round via the engine |
+| `POST /circles/:id/contribute` | NIP-98, member | 10/min; same caps and checks as pay, amount must equal the contribution | Shares the per-member payment lock with `/wallet/pay` |
+
+## Savings-circle engine
+
+- **Preimages are derived, never stored**: `HMAC-SHA256(secret, circle/cycle/attempt/member)`.
+  The database holds only payment hashes; a stolen DB can't settle anything. The
+  secret comes from `COORDINATOR_PREIMAGE_SECRET` or an owner-only file next to
+  the DB (`data/`, gitignored). Whoever holds it plus the invoice macaroon could
+  settle held contributions early, so it is treated like a key.
+- **Point of no return** is the first settle. Before it, a missed deadline or an
+  invoice cancelled/expired outside the engine cancels every hold invoice
+  (verified on regtest: balances restored exactly). After it, the engine only
+  rolls forward, and refuses to cancel if anything is settled.
+- **Restart safety**: on startup the engine reads every open round's invoice
+  states from LND (not the cache) and resumes: carries on collecting, settles the
+  rest, or retries the payout (persisted backoff). Covered by unit tests with
+  simulated crashes and by a regtest test that restarts the API mid-round.
+- **Payout** goes only to an invoice for exactly the pot, decoded and checked
+  before paying; fees are capped by `MAX_PAYOUT_FEE_SAT` and paid by the coordinator.
+- **Known gap**: the engine does not yet check each held HTLC's CLTV expiry
+  height before settling. With short contribution windows and an 80-block delta
+  this cannot bite in the demo; production needs it.
 
 `/wallet/pay` decodes via LND, checks network / amount / expiry, then enforces
 `MAX_PAYMENT_SAT` and `MAX_DAILY_SPEND_SAT`. The 24h total is computed from
