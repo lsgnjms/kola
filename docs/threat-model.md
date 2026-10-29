@@ -43,6 +43,23 @@ server verifies the signature and acts only on the wallet bound to that pubkey.
   table that is **not** rebuildable from LND + relay; it exists only because demo
   wallets are custodial and disappears with NWC.
 
+## Member keys on the device
+
+- Created in the browser with `nostr-tools` (`generateSecretKey`); never sent anywhere.
+- Stored in IndexedDB only as a **NIP-49 `ncryptsec`**: scrypt (cost 2^15, 32 MiB,
+  about 1 s on a mid-range phone) + XChaCha20-Poly1305, keyed by the member's
+  6-digit PIN. Standard format, proven library, no custom crypto.
+- Decrypted key is held in memory while unlocked and zeroed on lock. The app
+  locks after 5 minutes in the background and on "Lock".
+- After 5 wrong PINs the app makes the member wait (30 s, doubling, max 15 min),
+  persisted across reloads.
+
+**Honest limit:** a 6-digit PIN has only 10^6 possibilities. The wait protects
+against someone guessing in the app, not against an attacker who copies the
+IndexedDB data off an unlocked/rooted phone and brute-forces offline (scrypt makes
+that cost hours, not years). In the demo the key only authorizes a custodial regtest
+wallet; with NWC/mainnet we would add a longer passphrase option and key backup.
+
 ## Routes
 
 | Route | Auth | Limits | Notes |
@@ -93,7 +110,9 @@ caps in the API, payout invoices must equal the pot exactly
 | Macaroon in error messages | Transport errors carry LND's message only, never headers | Implemented |
 | Prompt injection into AI assistant | Read-only tools, no keys/invoices/preimages in context, untrusted-input framing | Pending |
 | Relay censorship / tampering | Events are signed; clients verify; state rebuildable from LND + relay | Pending |
-| Stolen phone | Nostr key encrypted with PIN-derived key; no spending key on device in demo | Pending |
+| Stolen phone | NIP-49 encrypted key, PIN wait-out after 5 tries, auto-lock; spend caps bound the damage of an unlocked phone | Implemented (see limit above) |
+| Swapped request body (e.g. a different invoice) | Client signs sha256 of the exact body; server rejects mismatches | Implemented |
+| Malicious server response | Web validates every response against shared Zod schemas | Implemented |
 | API abuse | Global rate limit (stricter on pay), 64 KB body limit, strict Zod bodies, generic error codes (no internals leaked) | Implemented for wallet routes |
 | Someone else spends a member's wallet | NIP-98 signature per request, bound to URL/method/body; replay cache | Implemented |
 | Stolen API database | Holds only pubkey → node bindings; no keys, invoices or balances | Implemented |
