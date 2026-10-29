@@ -2,6 +2,7 @@ import type { CreateInvoiceResponse } from "@kola/shared";
 import { useId, useMemo, useState, type FormEvent } from "react";
 import { renderSVG } from "uqr";
 import type { ApiClient } from "../api/client.js";
+import { copyText } from "../clipboard.js";
 import { useI18n } from "../i18n/index.js";
 import { ErrorMessage, Screen } from "../ui.js";
 
@@ -37,8 +38,7 @@ export default function Receive({ api, onDone }: { api: ApiClient; onDone: () =>
 
   const copy = async () => {
     if (!invoice) return;
-    await navigator.clipboard.writeText(invoice.paymentRequest);
-    setCopied(true);
+    setCopied(await copyText(invoice.paymentRequest));
   };
 
   if (invoice && qr) {

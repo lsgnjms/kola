@@ -32,7 +32,7 @@ const MemberNodes = z
 
 const Env = z.object({
   API_PORT: z.coerce.number().int().positive().default(3000),
-  API_HOST: z.string().default("0.0.0.0"),
+  API_HOST: z.string().default("127.0.0.1"),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
   CORS_ORIGINS: z
     .string()
@@ -42,7 +42,11 @@ const Env = z.object({
   MAX_DAILY_SPEND_SAT: z.coerce.number().int().positive().default(500_000),
   MAX_PAYOUT_FEE_SAT: z.coerce.number().int().nonnegative().default(50),
   /** The API's URL as the browser sees it; NIP-98 events are signed over it. */
-  PUBLIC_API_URL: z.string().url().default("http://localhost:5173/api"),
+  PUBLIC_API_URLS: z
+    .string()
+    .default("http://localhost:5173/api")
+    .transform((s) => s.split(",").map((u) => u.trim()).filter(Boolean))
+    .pipe(z.array(z.string().url()).min(1)),
   BITCOIN_NETWORK: z.enum(["regtest", "signet", "testnet", "mainnet"]).default("regtest"),
   DB_PATH: RepoPath.default("data/kola.sqlite"),
   MEMBER_NODES: MemberNodes.default(

@@ -39,7 +39,10 @@ const PAY_ERROR_STATUS: Record<PayError, number> = {
  */
 export async function walletRoutes(app: FastifyInstance, deps: WalletRouteDeps): Promise<void> {
   const payLock = new KeyedMutex();
-  app.addHook("preHandler", nostrAuth({ publicApiUrl: deps.env.PUBLIC_API_URL, nowS: () => Math.floor(deps.nowMs() / 1000) }));
+  app.addHook(
+    "preHandler",
+    nostrAuth({ publicApiUrls: deps.env.PUBLIC_API_URLS, nowS: () => Math.floor(deps.nowMs() / 1000) }),
+  );
 
   app.post("/wallet/claim", async (request, reply) => {
     const node = deps.bindings.claim(pubkeyOf(request), deps.nowMs());

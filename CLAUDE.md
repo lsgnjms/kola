@@ -31,7 +31,8 @@ cp .env.example .env
 docker compose -f infra/docker-compose.yml up -d   # regtest stack (bitcoind, 4× LND, relay)
 pnpm seed                                          # fund nodes, open channels, bake macaroons (demo circle: TODO)
 pnpm smoke                                         # check the LND REST client + macaroon scopes against the stack
-pnpm dev                                           # web (:5173) + api (:3000)
+pnpm dev                                           # web (:5173) + api (:3000), this PC only
+pnpm dev:lan                                       # same, web reachable from phones on the LAN (add LAN URL to PUBLIC_API_URLS)
 pnpm test                                          # unit tests
 pnpm test:integration                              # full cycle against regtest (TODO: not yet added)
 pnpm lint && pnpm typecheck

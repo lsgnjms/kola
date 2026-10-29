@@ -18,8 +18,8 @@ const MAX_HEADER_BYTES = 8 * 1024;
  * i.e. the URL the browser called (through the dev proxy or a reverse proxy).
  * Each signed header is accepted once, so a captured one can't be replayed.
  */
-export function nostrAuth(opts: { publicApiUrl: string; nowS: () => number }): preHandlerAsyncHookHandler {
-  const base = opts.publicApiUrl.replace(/\/+$/, "");
+export function nostrAuth(opts: { publicApiUrls: readonly string[]; nowS: () => number }): preHandlerAsyncHookHandler {
+  const bases = opts.publicApiUrls.map((u) => u.replace(/\/+$/, ""));
   const seen = new Map<string, number>();
 
   return async function verify(request: FastifyRequest, reply: FastifyReply) {
@@ -28,12 +28,13 @@ export function nostrAuth(opts: { publicApiUrl: string; nowS: () => number }): p
     if (!event) return deny(reply);
 
     const body = request.rawBody;
-    const result = verifyHttpAuthEvent(event, {
-      url: base + request.url,
-      method: request.method,
-      nowS,
-      ...(body ? { payloadSha256Hex: createHash("sha256").update(body, "utf8").digest("hex") } : {}),
-    });
+    const payload = body ? { payloadSha256Hex: createHash("sha256").update(body, "utf8").digest("hex") } : {};
+    // Try each configured public URL (e.g. localhost and the LAN address for phone testing).
+    let result: ReturnType<typeof verifyHttpAuthEvent> = { ok: false, reason: "wrong_url" };
+    for (const base of bases) {
+      result = verifyHttpAuthEvent(event, { url: base + request.url, method: request.method, nowS, ...payload });
+      if (result.ok || result.reason !== "wrong_url") break;
+    }
     if (!result.ok) {
       request.log.debug({ reason: result.reason }, "nostr auth rejected");
       return deny(reply);

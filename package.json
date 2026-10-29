@@ -10,6 +10,7 @@
   },
   "scripts": {
     "dev": "pnpm --parallel --filter \"./apps/*\" dev",
+    "dev:lan": "pnpm --parallel --filter \"./apps/*\" dev:lan",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint .",

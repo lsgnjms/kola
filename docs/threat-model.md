@@ -60,6 +60,15 @@ IndexedDB data off an unlocked/rooted phone and brute-forces offline (scrypt mak
 that cost hours, not years). In the demo the key only authorizes a custodial regtest
 wallet; with NWC/mainnet we would add a longer passphrase option and key backup.
 
+## Network exposure
+
+- The API binds `127.0.0.1` only; browsers reach it through the web server's
+  `/api` proxy. Regtest node ports are bound to `127.0.0.1` as well.
+- `pnpm dev` keeps the web app on this PC. `pnpm dev:lan` (opt-in, for phone
+  testing) exposes only the web dev server to the local network.
+- NIP-98 signatures name the URL the browser used; the API accepts only the
+  URLs listed in `PUBLIC_API_URLS`, so a request signed for another host fails.
+
 ## Routes
 
 | Route | Auth | Limits | Notes |
