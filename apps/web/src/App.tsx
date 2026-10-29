@@ -4,8 +4,10 @@ import { detectLocale, I18nContext, LOCALES, t as translate, type I18n, type Loc
 import { idbStorage } from "./keys/idbStorage.js";
 import { Keystore } from "./keys/keystore.js";
 import { Home } from "./screens/Home.js";
+import { Backup } from "./screens/Backup.js";
 import { Onboarding } from "./screens/Onboarding.js";
 import { Pay } from "./screens/Pay.js";
+import { Restore } from "./screens/Restore.js";
 import { Unlock } from "./screens/Unlock.js";
 import { ErrorMessage, Screen } from "./ui.js";
 
@@ -18,11 +20,12 @@ const AUTO_LOCK_MS = 5 * 60 * 1000;
 type Session =
   | { state: "loading" }
   | { state: "onboarding" }
+  | { state: "restoring" }
   | { state: "locked" }
   | { state: "setup"; error?: unknown }
   | { state: "ready" };
 
-type View = "home" | "receive" | "pay" | "circles";
+type View = "home" | "receive" | "pay" | "circles" | "backup";
 
 const keystore = new Keystore(idbStorage);
 
@@ -89,6 +92,19 @@ export function App() {
             await keystore.create(pin);
             await setUpWallet();
           }}
+          onRestore={() => setSession({ state: "restoring" })}
+        />
+      );
+      break;
+    case "restoring":
+      content = (
+        <Restore
+          onBack={() => setSession({ state: "onboarding" })}
+          onRestore={async (backup, pin) => {
+            const ok = await keystore.restore(backup, pin);
+            if (ok) await setUpWallet();
+            return ok;
+          }}
         />
       );
       break;
@@ -129,10 +145,18 @@ export function App() {
           <Suspense fallback={<p aria-busy="true">{t("common.loading")}</p>}>
             <Receive api={api} onDone={() => setView("home")} />
           </Suspense>
+        ) : view === "backup" ? (
+          <Backup keystore={keystore} onDone={() => setView("home")} />
         ) : view === "pay" ? (
           <Pay api={api} onDone={() => setView("home")} />
         ) : (
-          <Home api={api} onReceive={() => setView("receive")} onPay={() => setView("pay")} onLock={lock} />
+          <Home
+            api={api}
+            onReceive={() => setView("receive")}
+            onPay={() => setView("pay")}
+            onBackup={() => setView("backup")}
+            onLock={lock}
+          />
         );
       break;
   }

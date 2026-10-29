@@ -95,6 +95,47 @@ export class Keystore {
     return { ok: true };
   }
 
+  /**
+   * Restores a key from a backup code (NIP-49 `ncryptsec`) and its PIN.
+   * Re-encrypts at this app's scrypt cost so unlocking stays fast on phones.
+   * Returns false if the code or PIN is wrong.
+   */
+  async restore(backup: string, pin: string): Promise<boolean> {
+    assertPin(pin);
+    let secretKey: Uint8Array;
+    try {
+      secretKey = nip49.decrypt(backup.trim(), pin);
+    } catch {
+      return false;
+    }
+    const pubkey = getPublicKey(secretKey);
+    const stored: StoredKey = { ncryptsec: nip49.encrypt(secretKey, pin, this.logn), pubkey };
+    await this.storage.set(RECORD_KEY, JSON.stringify(stored));
+    await this.saveAttempts({ failures: 0, lastFailureMs: 0 });
+    this.secretKey = secretKey;
+    this.pubkeyHex = pubkey;
+    return true;
+  }
+
+  /**
+   * The backup code, after re-checking the PIN (wrong PINs count toward the
+   * wait-out, same as unlocking). The code is useless without the PIN.
+   */
+  async exportBackup(pin: string): Promise<{ ok: true; backup: string } | { ok: false; retryAfterMs: number }> {
+    const waitMs = await this.retryAfterMs();
+    if (waitMs > 0) return { ok: false, retryAfterMs: waitMs };
+    const stored = await this.load();
+    if (!stored) throw new Error("no key on this device");
+    try {
+      nip49.decrypt(stored.ncryptsec, pin).fill(0);
+    } catch {
+      const attempts = await this.loadAttempts();
+      await this.saveAttempts({ failures: attempts.failures + 1, lastFailureMs: this.now() });
+      return { ok: false, retryAfterMs: await this.retryAfterMs() };
+    }
+    return { ok: true, backup: stored.ncryptsec };
+  }
+
   lock(): void {
     this.secretKey?.fill(0);
     this.secretKey = null;

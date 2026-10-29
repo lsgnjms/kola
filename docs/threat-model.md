@@ -54,6 +54,12 @@ server verifies the signature and acts only on the wallet bound to that pubkey.
 - After 5 wrong PINs the app makes the member wait (30 s, doubling, max 15 min),
   persisted across reloads.
 
+- **Backup code** = the same NIP-49 `ncryptsec`, shown only after the PIN is
+  re-entered (wrong PINs count toward the wait-out). Useless without the PIN.
+  Restore re-encrypts at this app's scrypt cost.
+- **Demo identities** (`pnpm seed` / `pnpm demo`) are regtest throwaway keys with
+  the published PIN 123456, written to `data/demo/` (gitignored). Never reuse them.
+
 **Honest limit:** a 6-digit PIN has only 10^6 possibilities. The wait protects
 against someone guessing in the app, not against an attacker who copies the
 IndexedDB data off an unlocked/rooted phone and brute-forces offline (scrypt makes

@@ -129,5 +129,16 @@
   "contrib.unpaid": "Pas encore payé",
   "contrib.held": "Payé, mis de côté",
   "contrib.paid": "Payé",
-  "contrib.refunded": "Remboursé"
+  "contrib.refunded": "Remboursé",
+  "home.backup": "Sauvegarder mon portefeuille",
+  "backup.title": "Sauvegarder votre portefeuille",
+  "backup.explain": "Votre code de sauvegarde vous permet d’utiliser Kola sur un nouveau téléphone si celui-ci est perdu. Il ne fonctionne qu’avec votre code PIN. Conservez-le en lieu sûr et ne communiquez jamais votre code PIN.",
+  "backup.reveal": "Afficher le code de sauvegarde",
+  "backup.codeLabel": "Votre code de sauvegarde",
+  "restore.start": "J’ai déjà une sauvegarde",
+  "restore.title": "Restaurer une sauvegarde",
+  "restore.codeLabel": "Code de sauvegarde",
+  "restore.pinLabel": "Code PIN de cette sauvegarde",
+  "restore.submit": "Restaurer",
+  "restore.wrong": "Le code de sauvegarde ou le code PIN n’est pas correct."
 }

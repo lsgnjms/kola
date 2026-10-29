@@ -29,7 +29,8 @@ Prereqs: Node 22+, `corepack enable` (pnpm version is pinned in `package.json`),
 pnpm install
 cp .env.example .env
 docker compose -f infra/docker-compose.yml up -d   # regtest stack (bitcoind, 4× LND, relay)
-pnpm seed                                          # fund nodes, open channels, bake macaroons (demo circle: TODO)
+pnpm seed                                          # fund nodes, open channels, bake macaroons, create demo circle
+pnpm demo:reset                                    # wipe circles + wallet links, recreate demo circle (stop pnpm dev first)
 pnpm smoke                                         # check the LND REST client + macaroon scopes against the stack
 pnpm dev                                           # web (:5173) + api (:3000), this PC only
 pnpm dev:lan                                       # same, web reachable from phones on the LAN (add LAN URL to PUBLIC_API_URLS)

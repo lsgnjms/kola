@@ -6,7 +6,13 @@ import { PinField, Screen } from "../ui.js";
 type Step = "welcome" | "create" | "confirm" | "working";
 
 /** Welcome → choose PIN → confirm PIN → key is created on this device. */
-export function Onboarding({ onCreate }: { onCreate: (pin: string) => Promise<void> }) {
+export function Onboarding({
+  onCreate,
+  onRestore,
+}: {
+  onCreate: (pin: string) => Promise<void>;
+  onRestore: () => void;
+}) {
   const { t } = useI18n();
   const [step, setStep] = useState<Step>("welcome");
   const [pin, setPin] = useState("");
@@ -19,6 +25,9 @@ export function Onboarding({ onCreate }: { onCreate: (pin: string) => Promise<vo
         <p>{t("onboarding.body")}</p>
         <button type="button" className="primary" onClick={() => setStep("create")}>
           {t("onboarding.start")}
+        </button>
+        <button type="button" className="secondary" onClick={onRestore}>
+          {t("restore.start")}
         </button>
       </Screen>
     );

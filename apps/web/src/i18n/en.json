@@ -129,5 +129,16 @@
   "contrib.unpaid": "Not paid yet",
   "contrib.held": "Paid, set aside",
   "contrib.paid": "Paid",
-  "contrib.refunded": "Refunded"
+  "contrib.refunded": "Refunded",
+  "home.backup": "Back up my wallet",
+  "backup.title": "Back up your wallet",
+  "backup.explain": "Your backup code lets you use Kola on a new phone if this one is lost. It only works together with your PIN. Save it somewhere private, and never share your PIN.",
+  "backup.reveal": "Show backup code",
+  "backup.codeLabel": "Your backup code",
+  "restore.start": "I already have a backup",
+  "restore.title": "Restore from a backup",
+  "restore.codeLabel": "Backup code",
+  "restore.pinLabel": "PIN for this backup",
+  "restore.submit": "Restore",
+  "restore.wrong": "The backup code or the PIN is not right."
 }

@@ -3,11 +3,13 @@
  * in both directions between the coordinator and each member, so members can
  * pay contributions in and the coordinator can pay the pot out.
  *
- * Safe to re-run: existing channels are left alone.
+ * Then creates the demo circle (see scripts/demo.ts).
+ * Safe to re-run: existing channels and the demo circle are left alone.
  * Usage: docker compose -f infra/docker-compose.yml up -d && pnpm seed
  */
 import { execFileSync } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
+import { createDemo } from "./demo.js";
 
 const COMPOSE = ["compose", "-f", "infra/docker-compose.yml"];
 const MEMBERS = ["alice", "bob", "carol"] as const;
@@ -198,8 +200,9 @@ async function main(): Promise<void> {
   bakeMacaroon(COORDINATOR, "payout", PAYOUT_URIS);
   for (const m of MEMBERS) bakeMacaroon(m, "wallet", MEMBER_WALLET_URIS);
 
-  // TODO(circle milestone): create the demo circle (3 members, cycle ready to open) via the API.
-  console.log("Seed complete: nodes funded, channels active, macaroons in infra/data/coordinator/kola/.");
+  console.log("Creating the demo circle…");
+  createDemo();
+  console.log("\nSeed complete: nodes funded, channels active, demo circle ready.");
 }
 
 main().catch((err: unknown) => {

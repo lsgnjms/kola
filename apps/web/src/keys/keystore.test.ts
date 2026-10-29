@@ -67,6 +67,22 @@ describe("Keystore", () => {
     expect(await reloaded.unlock("123456")).toEqual({ ok: true });
   });
 
+  it("backs up and restores the same identity on another device", async () => {
+    const phone1 = new Keystore(memoryStorage(), Date.now, LOGN);
+    const pubkey = await phone1.create("123456");
+    expect(await phone1.exportBackup("000000")).toEqual({ ok: false, retryAfterMs: 0 });
+    const exported = await phone1.exportBackup("123456");
+    if (!exported.ok) throw new Error("export failed");
+    expect(exported.backup).toMatch(/^ncryptsec1/);
+
+    const phone2 = new Keystore(memoryStorage(), Date.now, LOGN);
+    expect(await phone2.restore(exported.backup, "654321")).toBe(false);
+    expect(await phone2.restore("not a backup", "123456")).toBe(false);
+    expect(await phone2.restore(`  ${exported.backup}\n`, "123456")).toBe(true);
+    expect(phone2.pubkey).toBe(pubkey);
+    expect(phone2.sign(template).pubkey).toBe(pubkey);
+  });
+
   it("rejects PINs that aren't 6 digits", async () => {
     const ks = new Keystore(memoryStorage(), Date.now, LOGN);
     await expect(ks.create("1234")).rejects.toThrow();

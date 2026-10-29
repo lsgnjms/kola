@@ -14,11 +14,13 @@ export function Home({
   api,
   onReceive,
   onPay,
+  onBackup,
   onLock,
 }: {
   api: ApiClient;
   onReceive: () => void;
   onPay: () => void;
+  onBackup: () => void;
   onLock: () => void;
 }) {
   const { t, locale } = useI18n();
@@ -98,6 +100,9 @@ export function Home({
         ))}
       </ul>
 
+      <button type="button" className="secondary" onClick={onBackup}>
+        {t("home.backup")}
+      </button>
       <button type="button" className="secondary" onClick={onLock}>
         {t("home.lock")}
       </button>
