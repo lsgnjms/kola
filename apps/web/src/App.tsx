@@ -10,6 +10,7 @@ import { Unlock } from "./screens/Unlock.js";
 import { ErrorMessage, Screen } from "./ui.js";
 
 const Receive = lazy(() => import("./screens/Receive.js"));
+const CirclesSection = lazy(() => import("./screens/circles/CirclesSection.js"));
 
 /** Lock again after this long in the background. */
 const AUTO_LOCK_MS = 5 * 60 * 1000;
@@ -21,7 +22,7 @@ type Session =
   | { state: "setup"; error?: unknown }
   | { state: "ready" };
 
-type View = "home" | "receive" | "pay";
+type View = "home" | "receive" | "pay" | "circles";
 
 const keystore = new Keystore(idbStorage);
 
@@ -120,7 +121,11 @@ export function App() {
       break;
     case "ready":
       content =
-        view === "receive" ? (
+        view === "circles" ? (
+          <Suspense fallback={<p aria-busy="true">{t("common.loading")}</p>}>
+            <CirclesSection api={api} />
+          </Suspense>
+        ) : view === "receive" ? (
           <Suspense fallback={<p aria-busy="true">{t("common.loading")}</p>}>
             <Receive api={api} onDone={() => setView("home")} />
           </Suspense>
@@ -145,6 +150,16 @@ export function App() {
             ))}
           </select>
         </header>
+        {session.state === "ready" && (
+          <nav className="tabs" aria-label={t("app.name")}>
+            <button type="button" aria-current={view !== "circles" ? "page" : undefined} onClick={() => setView("home")}>
+              {t("nav.wallet")}
+            </button>
+            <button type="button" aria-current={view === "circles" ? "page" : undefined} onClick={() => setView("circles")}>
+              {t("nav.circles")}
+            </button>
+          </nav>
+        )}
         {content}
       </main>
     </I18nContext.Provider>

@@ -246,3 +246,131 @@ button:disabled {
   font-size: 0.875rem;
   word-break: break-all;
 }
+
+.tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin: 0.75rem 0 1rem;
+}
+
+.tabs button {
+  background: transparent;
+  color: var(--fg);
+  border: 1px solid var(--border);
+}
+
+.tabs button[aria-current="page"] {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+}
+
+h3 {
+  margin: 0.5rem 0 0;
+  font-size: 1.125rem;
+}
+
+.cards,
+.members,
+.contributions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+  text-align: left;
+  font-weight: 400;
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--border);
+}
+
+.badge {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.badge-active {
+  color: var(--accent);
+}
+
+.notice:not(.notice-error) {
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.notice {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.code {
+  font-family: ui-monospace, "Cascadia Mono", Menlo, monospace;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+
+input.code {
+  font-size: 1.5rem;
+  text-align: center;
+}
+
+.round {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.round-state {
+  font-weight: 600;
+}
+
+.countdown {
+  font-variant-numeric: tabular-nums;
+}
+
+.contrib,
+.members li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.contrib-held,
+.contrib-paid {
+  color: var(--in);
+  font-weight: 600;
+}
+
+.contrib-refunded {
+  color: var(--muted);
+}
+
+.members li.current {
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.members small,
+.field small {
+  color: var(--muted);
+  font-size: 0.875rem;
+}

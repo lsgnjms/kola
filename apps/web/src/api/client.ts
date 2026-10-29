@@ -1,7 +1,12 @@
 import {
   ApiErrorBody,
   BalanceResponse,
+  CircleListResponse,
+  CircleView,
   ClaimResponse,
+  ContributeResponse,
+  type CreateCircleRequest,
+  type JoinCircleRequest,
   CreateInvoiceResponse,
   DecodeResponse,
   HistoryResponse,
@@ -69,6 +74,32 @@ export class ApiClient {
 
   history() {
     return this.call("GET", "/wallet/history", HistoryResponse);
+  }
+
+  listCircles() {
+    return this.call("GET", "/circles", CircleListResponse);
+  }
+
+  createCircle(input: CreateCircleRequest) {
+    return this.call("POST", "/circles", CircleView, input);
+  }
+
+  joinCircle(input: JoinCircleRequest) {
+    return this.call("POST", "/circles/join", CircleView, input);
+  }
+
+  getCircle(id: string) {
+    return this.call("GET", `/circles/${encodeURIComponent(id)}`, CircleView);
+  }
+
+  openRound(id: string) {
+    return this.call("POST", `/circles/${encodeURIComponent(id)}/cycles`, CircleView);
+  }
+
+  contribute(id: string) {
+    return this.call("POST", `/circles/${encodeURIComponent(id)}/contribute`, ContributeResponse, undefined, {
+      isPayment: true,
+    });
   }
 
   private async call<S extends z.ZodTypeAny>(
