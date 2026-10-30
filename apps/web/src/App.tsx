@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
-import { ApiClient } from "./api/client.js";
+import { ApiClient, ApiError } from "./api/client.js";
 import { detectLocale, I18nContext, LOCALES, t as translate, type I18n, type Locale } from "./i18n/index.js";
 import { idbStorage } from "./keys/idbStorage.js";
 import { Keystore } from "./keys/keystore.js";
@@ -99,7 +99,9 @@ export function App() {
     case "restoring":
       content = (
         <Restore
-          onBack={() => setSession({ state: "onboarding" })}
+          onBack={() =>
+            void keystore.status().then((s) => (s === "none" ? setSession({ state: "onboarding" }) : setUpWallet()))
+          }
           onRestore={async (backup, pin) => {
             const ok = await keystore.restore(backup, pin);
             if (ok) await setUpWallet();
@@ -130,6 +132,13 @@ export function App() {
               <button type="button" className="primary" onClick={() => void setUpWallet()}>
                 {t("common.retry")}
               </button>
+              {/* This key has no wallet to lose, so swapping it for a backup is safe. Otherwise a
+                  phone holding an old key could never reach restore: it unlocks straight to here. */}
+              {session.error instanceof ApiError && session.error.code === "no_wallet_available" && (
+                <button type="button" className="secondary" onClick={() => setSession({ state: "restoring" })}>
+                  {t("restore.start")}
+                </button>
+              )}
             </>
           )}
         </Screen>

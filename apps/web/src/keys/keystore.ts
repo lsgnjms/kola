@@ -112,6 +112,7 @@ export class Keystore {
     const stored: StoredKey = { ncryptsec: nip49.encrypt(secretKey, pin, this.logn), pubkey };
     await this.storage.set(RECORD_KEY, JSON.stringify(stored));
     await this.saveAttempts({ failures: 0, lastFailureMs: 0 });
+    this.secretKey?.fill(0);
     this.secretKey = secretKey;
     this.pubkeyHex = pubkey;
     return true;

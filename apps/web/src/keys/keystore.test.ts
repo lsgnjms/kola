@@ -83,6 +83,28 @@ describe("Keystore", () => {
     expect(phone2.sign(template).pubkey).toBe(pubkey);
   });
 
+  it("restoring replaces a key already on the device, and a failed restore keeps it", async () => {
+    const other = new Keystore(memoryStorage(), Date.now, LOGN);
+    const demoPubkey = await other.create("123456");
+    const exported = await other.exportBackup("123456");
+    if (!exported.ok) throw new Error("export failed");
+
+    const storage = memoryStorage();
+    const phone = new Keystore(storage, Date.now, LOGN);
+    const oldPubkey = await phone.create("111111");
+
+    expect(await phone.restore(exported.backup, "000000")).toBe(false);
+    expect(phone.sign(template).pubkey).toBe(oldPubkey);
+
+    expect(await phone.restore(exported.backup, "123456")).toBe(true);
+    expect(phone.sign(template).pubkey).toBe(demoPubkey);
+
+    // The restored key is what comes back after a reload, with the backup's PIN.
+    const reloaded = new Keystore(storage, Date.now, LOGN);
+    expect(await reloaded.unlock("123456")).toEqual({ ok: true });
+    expect(reloaded.pubkey).toBe(demoPubkey);
+  });
+
   it("rejects PINs that aren't 6 digits", async () => {
     const ks = new Keystore(memoryStorage(), Date.now, LOGN);
     await expect(ks.create("1234")).rejects.toThrow();
