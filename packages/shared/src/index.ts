@@ -4,5 +4,7 @@ export * from "./rotation.js";
 export * from "./cycle.js";
 export * from "./nostr/kinds.js";
 export * from "./nostr/httpAuth.js";
+export * from "./nostr/events.js";
+export * from "./nostr/audit.js";
 export * from "./api/wallet.js";
 export * from "./api/circles.js";

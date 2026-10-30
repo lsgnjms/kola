@@ -1,12 +1,11 @@
 import { createHash, randomBytes } from "node:crypto";
-import type { HoldInvoiceState } from "@kola/shared";
+import { eventKey, type CircleEvent, type HoldInvoiceState } from "@kola/shared";
 import type { FastifyBaseLogger } from "fastify";
 import { beforeEach, describe, expect, it } from "vitest";
 import { openDb } from "../db.js";
 import type { DecodedInvoice, PaymentResult, WalletProvider } from "../wallet/WalletProvider.js";
 import { CycleEngine, EngineError, type EngineDeps } from "./engine.js";
 import { derivePreimage } from "./preimage.js";
-import type { CircleEvent } from "./publisher.js";
 import { CircleStore } from "./store.js";
 
 const sha256 = (hex: string) => createHash("sha256").update(Buffer.from(hex, "hex")).digest("hex");
@@ -72,7 +71,7 @@ class FakeLnd implements WalletProvider {
     const status = this.payResults.shift() ?? "succeeded";
     const result: PaymentResult =
       status === "succeeded"
-        ? { status, paymentHash: i.paymentHash, feeSat: 1 }
+        ? { status, paymentHash: i.paymentHash, feeSat: 1, preimage: "ab".repeat(32) }
         : status === "failed"
           ? { status, paymentHash: i.paymentHash, reason: "FAILURE_REASON_NO_ROUTE" }
           : { status, paymentHash: i.paymentHash };
@@ -123,7 +122,12 @@ function makeEngine(overrides: Partial<EngineDeps> = {}) {
       });
       return pr;
     },
-    publisher: { publish: async (e) => void events.push(e) },
+    // Same contract as NostrPublisher: repeating a fact records it once.
+    publisher: {
+      publish: async (e) => {
+        if (!events.some((known) => eventKey(known) === eventKey(e))) events.push(e);
+      },
+    },
     preimageSecret: secret,
     network: "regtest",
     nowMs: () => now,
@@ -298,6 +302,32 @@ describe("CycleEngine", () => {
     lnd.hold(h2 ?? "");
     await flush();
     expect(store.latestCycle(circleId)?.state).toBe("paid_out");
+  });
+
+  it("records a held payment even when the ticker sees it before the subscription", async () => {
+    const circleId = activeCircle();
+    const engine = makeEngine();
+    await engine.openNextCycle(circleId);
+    lnd.notify = false;
+    lnd.hold(hashes(circleId)[0] ?? "");
+    await engine.tick();
+    expect(events.filter((e) => e.type === "contribution_held")).toHaveLength(1);
+  });
+
+  it("a crash mid-settlement still leaves a complete record", async () => {
+    const circleId = activeCircle();
+    lnd.notify = false;
+    await makeEngine().openNextCycle(circleId);
+    for (const h of hashes(circleId)) lnd.hold(h);
+    await lnd.settleHoldInvoice(derivePreimage(secret, { circleId, cycleIndex: 0, attempt: 1, memberPubkey: MEMBERS[0] ?? "" }));
+
+    lnd.notify = true;
+    await makeEngine().tick();
+
+    const count = (type: CircleEvent["type"]) => events.filter((e) => e.type === type).length;
+    expect(count("contribution_held")).toBe(3);
+    expect(count("contribution_settled")).toBe(3);
+    expect(count("payout_sent")).toBe(1);
   });
 
   it("an invoice cancelled outside the engine refunds everyone", async () => {

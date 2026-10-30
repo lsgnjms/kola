@@ -76,6 +76,6 @@ export interface DecodedInvoice {
 }
 
 export type PaymentResult =
-  | { status: "succeeded"; paymentHash: PaymentHashHex; feeSat: number }
+  | { status: "succeeded"; paymentHash: PaymentHashHex; feeSat: number; /** Proof of payment. */ preimage: string }
   | { status: "in_flight"; paymentHash: PaymentHashHex }
   | { status: "failed"; paymentHash: PaymentHashHex; reason: string };

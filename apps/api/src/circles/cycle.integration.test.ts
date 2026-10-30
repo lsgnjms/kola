@@ -7,9 +7,10 @@ import { createHash, randomBytes } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { httpAuthTemplate, type CircleView } from "@kola/shared";
+import { auditCircle, buildCircleEvent, CIRCLE_KINDS, circleAddress, httpAuthTemplate, type CircleView } from "@kola/shared";
 import type { FastifyInstance } from "fastify";
-import { finalizeEvent, generateSecretKey } from "nostr-tools/pure";
+import { finalizeEvent, generateSecretKey, getPublicKey } from "nostr-tools/pure";
+import { Relay } from "nostr-tools/relay";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { loadEnv } from "../env.js";
 import { buildServer } from "../server.js";
@@ -101,6 +102,35 @@ beforeAll(async () => {
   await call("bob", "POST", "/circles/join", { joinCode: created.json.joinCode, nickname: "Bob" });
   const joined = await call<CircleView>("carol", "POST", "/circles/join", { joinCode: created.json.joinCode, nickname: "Carol" });
   expect(joined.json.status).toBe("active");
+
+  // Each member signs their own agreement to the rules, as the web app does.
+  for (const who of Object.keys(keys) as Who[]) {
+    const view = (await circle(who, circleId));
+    const event = finalizeEvent(
+      buildCircleEvent(
+        {
+          type: "circle_joined",
+          circleId,
+          member: getPublicKey(keys[who]),
+          contributionSat: view.contributionSat,
+          memberCount: view.memberCount,
+        },
+        { coordinatorPubkey: view.coordinatorPubkey, nowS: Math.floor(Date.now() / 1000) },
+      ),
+      keys[who],
+    );
+    const res = await call<CircleView>(who, "POST", `/circles/${circleId}/join-record`, { event });
+    expect(res.json.joinRecorded, who).toBe(true);
+  }
+  // A member can't record a join for someone else.
+  const forged = finalizeEvent(
+    buildCircleEvent(
+      { type: "circle_joined", circleId, member: getPublicKey(keys.bob), contributionSat: CONTRIBUTION, memberCount: 3 },
+      { coordinatorPubkey: joined.json.coordinatorPubkey, nowS: Math.floor(Date.now() / 1000) },
+    ),
+    keys.bob,
+  );
+  expect((await call("alice", "POST", `/circles/${circleId}/join-record`, { event: forged })).status).toBe(400);
 }, 60_000);
 
 afterAll(async () => {
@@ -162,4 +192,49 @@ describe("savings circle on regtest", () => {
     const done = await waitForState(circleId, ["paid_out"], 30_000);
     expect(done.completedCycles).toBe(2);
   }, 90_000);
+
+  it("public record: every round is on the relay, verifies, and carries no names", async () => {
+    const view = await circle("alice", circleId);
+    const relay = await Relay.connect("ws://127.0.0.1:7777");
+    const readRecord = () =>
+      new Promise<unknown[]>((resolve) => {
+        const events: unknown[] = [];
+        const sub = relay.subscribe(
+          [{ kinds: [...CIRCLE_KINDS], "#a": [circleAddress(view.coordinatorPubkey, circleId)] }],
+          {
+            onevent: (e) => events.push(e),
+            oneose: () => {
+              sub.close();
+              resolve(events);
+            },
+          },
+        );
+      });
+    const expected = { circleId, coordinatorPubkey: view.coordinatorPubkey };
+
+    // Delivery is asynchronous: wait for the last round's payout to reach the relay.
+    let raw: unknown[] = [];
+    for (let i = 0; i < 40; i++) {
+      raw = await readRecord();
+      const payouts = auditCircle(raw, expected).entries.filter((e) => e.event.type === "payout_sent");
+      if (payouts.length === 2) break;
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    relay.close();
+
+    const { entries, problems } = auditCircle(raw, expected);
+    expect(problems).toEqual([]);
+    const count = (type: string) => entries.filter((e) => e.event.type === type).length;
+    expect(count("circle_defined")).toBe(1);
+    expect(count("circle_joined")).toBe(3);
+    expect(count("cycle_opened")).toBe(3); // round 1, round 2 cancelled, round 2 retried
+    expect(count("cycle_cancelled")).toBe(1);
+    expect(count("contribution_settled")).toBe(6);
+    expect(count("payout_sent")).toBe(2);
+
+    const onTheWire = JSON.stringify(raw);
+    for (const secret of ["Integration tontine", "Alice", "Bob", "Carol", view.joinCode]) {
+      expect(onTheWire, secret).not.toContain(secret);
+    }
+  }, 60_000);
 });

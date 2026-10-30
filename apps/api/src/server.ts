@@ -7,8 +7,9 @@ import { walletRoutes } from "./routes/wallet.js";
 import { WalletBindings } from "./wallet/bindings.js";
 import { MemberWallets, type WalletLoader } from "./wallet/memberWallets.js";
 import { CycleEngine } from "./circles/engine.js";
-import { LogPublisher } from "./circles/publisher.js";
-import { loadPreimageSecret } from "./circles/secret.js";
+import { NostrPublisher, type RelaySend } from "./circles/publisher.js";
+import { relaySender } from "./circles/relaySender.js";
+import { loadCoordinatorKey, loadPreimageSecret } from "./circles/secret.js";
 import { CircleStore } from "./circles/store.js";
 import { circleRoutes } from "./routes/circles.js";
 import { lndWalletFromFiles } from "./wallet/lnd/fromFiles.js";
@@ -36,6 +37,7 @@ export interface ServerDeps {
   /** Overrides for tests. */
   walletLoader?: WalletLoader;
   coordinatorLoader?: () => Promise<WalletProvider>;
+  relaySend?: RelaySend;
   nowMs?: () => number;
   /** Run the cycle engine ticker (default true). Tests drive the engine directly. */
   startEngine?: boolean;
@@ -89,6 +91,13 @@ export async function buildServer(env: Env, deps: ServerDeps = {}): Promise<Fast
           payoutMacaroonPath: env.COORDINATOR_PAYOUT_MACAROON_PATH,
         })),
   );
+  const publisher = new NostrPublisher({
+    db,
+    secretKey: loadCoordinatorKey(env),
+    send: deps.relaySend ?? relaySender(env.NOSTR_RELAY_URL),
+    nowS: () => Math.floor(nowMs() / 1000),
+    log: app.log,
+  });
   const engine = new CycleEngine({
     store,
     coordinator,
@@ -99,7 +108,7 @@ export async function buildServer(env: Env, deps: ServerDeps = {}): Promise<Fast
       const wallet = await wallets.get(node);
       return (await wallet.createInvoice({ amountSat, expirySeconds: 600, memo: "Kola" })).paymentRequest;
     },
-    publisher: new LogPublisher(app.log),
+    publisher,
     preimageSecret: loadPreimageSecret(env),
     network: env.BITCOIN_NETWORK,
     nowMs,
@@ -112,9 +121,13 @@ export async function buildServer(env: Env, deps: ServerDeps = {}): Promise<Fast
       payoutRetryMaxMs: 10 * 60_000,
     },
   });
-  if (deps.startEngine ?? true) engine.start();
+  if (deps.startEngine ?? true) {
+    engine.start();
+    publisher.start();
+  }
   app.addHook("onClose", async () => {
     engine.stop();
+    publisher.stop();
     db.close();
   });
 
@@ -124,7 +137,7 @@ export async function buildServer(env: Env, deps: ServerDeps = {}): Promise<Fast
   }));
 
   await app.register(walletRoutes, { env, bindings, wallets, payLock, nowMs });
-  await app.register(circleRoutes, { env, bindings, wallets, payLock, store, engine, coordinator, nowMs });
+  await app.register(circleRoutes, { env, bindings, wallets, payLock, store, engine, coordinator, publisher, nowMs });
 
   return app;
 }

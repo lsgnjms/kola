@@ -230,7 +230,7 @@ function firstMessage(
 function toPaymentResult(p: z.infer<typeof PaymentUpdate>): PaymentResult {
   switch (p.status) {
     case "SUCCEEDED":
-      return { status: "succeeded", paymentHash: p.payment_hash, feeSat: p.fee_sat };
+      return { status: "succeeded", paymentHash: p.payment_hash, feeSat: p.fee_sat, preimage: p.payment_preimage };
     case "FAILED":
       return { status: "failed", paymentHash: p.payment_hash, reason: p.failure_reason };
     default:
@@ -279,6 +279,7 @@ const PaymentUpdate = z.object({
   status: z.enum(["UNKNOWN", "IN_FLIGHT", "SUCCEEDED", "FAILED", "INITIATED"]),
   fee_sat: Int.default(0),
   failure_reason: z.string().default("FAILURE_REASON_NONE"),
+  payment_preimage: z.string().default(""),
 });
 
 /** Nanosecond timestamps exceed Number.MAX_SAFE_INTEGER; truncate to ms on the string. */

@@ -12,7 +12,10 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import { dirname, join, relative } from "node:path";
 import { randomUUID } from "node:crypto";
 import * as nip49 from "nostr-tools/nip49";
-import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
+import { finalizeEvent, generateSecretKey, getPublicKey } from "nostr-tools/pure";
+import { buildCircleEvent, eventKey, type CircleEvent } from "@kola/shared";
+import { NostrPublisher } from "../apps/api/src/circles/publisher.js";
+import { loadCoordinatorKey } from "../apps/api/src/circles/secret.js";
 import { CircleStore } from "../apps/api/src/circles/store.js";
 import { openDb } from "../apps/api/src/db.js";
 import { loadEnv } from "../apps/api/src/env.js";
@@ -23,7 +26,7 @@ const JOIN_CODE = "DAKAR2";
 const MEMBERS = ["Aminata", "Fatou", "Moussa"] as const;
 const CONTRIBUTION_SAT = 10_000;
 
-export function createDemo(): void {
+export async function createDemo(): Promise<void> {
   const env = loadEnv();
   const demoDir = join(dirname(env.DB_PATH), "demo");
   const db = openDb(env.DB_PATH);
@@ -49,7 +52,7 @@ export function createDemo(): void {
     mkdirSync(demoDir, { recursive: true });
     const members = MEMBERS.map((nickname) => {
       const secretKey = generateSecretKey();
-      return { nickname, pubkey: getPublicKey(secretKey), backup: nip49.encrypt(secretKey, DEMO_PIN, 15) };
+      return { nickname, secretKey, pubkey: getPublicKey(secretKey), backup: nip49.encrypt(secretKey, DEMO_PIN, 15) };
     });
 
     store.createCircle({
@@ -69,6 +72,39 @@ export function createDemo(): void {
       writeFileSync(join(demoDir, `${m.nickname.toLowerCase()}.txt`), `${m.backup}\n`);
       console.log(`  ${m.nickname.padEnd(8)} wallet: ${node}`);
     }
+    // Queue the circle's first public records; the API delivers them to the relay when it runs.
+    const nowS = Math.floor(now / 1000);
+    const publisher = new NostrPublisher({
+      db,
+      secretKey: loadCoordinatorKey(env),
+      send: async () => {},
+      nowS: () => nowS,
+      log: console,
+    });
+    const { coordinatorPubkey } = publisher;
+    await publisher.publish({
+      type: "circle_defined",
+      circleId,
+      definition: {
+        id: circleId,
+        contributionSat: CONTRIBUTION_SAT,
+        periodSeconds: 7 * 24 * 3600,
+        memberCount: MEMBERS.length,
+        coordinatorPubkey,
+        rotation: members.map((m) => m.pubkey),
+      },
+    });
+    for (const m of members) {
+      const join: CircleEvent = {
+        type: "circle_joined",
+        circleId,
+        member: m.pubkey,
+        contributionSat: CONTRIBUTION_SAT,
+        memberCount: MEMBERS.length,
+      };
+      publisher.addSigned(eventKey(join), finalizeEvent(buildCircleEvent(join, { coordinatorPubkey, nowS }), m.secretKey));
+    }
+
     writeFileSync(
       join(demoDir, "README.txt"),
       `Kola demo identities (regtest only). On each phone: "I already have a backup",\npaste one code, PIN ${DEMO_PIN}. Aminata is the organizer.\n`,
@@ -80,7 +116,7 @@ export function createDemo(): void {
   }
 }
 
-export function resetDemo(): void {
+export async function resetDemo(): Promise<void> {
   const env = loadEnv();
   for (const suffix of ["", "-wal", "-shm"]) {
     const path = `${env.DB_PATH}${suffix}`;
@@ -95,7 +131,7 @@ export function resetDemo(): void {
   }
   rmSync(join(dirname(env.DB_PATH), "demo"), { recursive: true, force: true });
   console.log("Cleared circles and wallet links.");
-  createDemo();
+  await createDemo();
 }
 
 function isBound(db: ReturnType<typeof openDb>, node: string): boolean {
@@ -112,8 +148,8 @@ function printBackups(demoDir: string): void {
 
 if (process.argv[1]?.replace(/\\/g, "/").endsWith("scripts/demo.ts")) {
   try {
-    if (process.argv[2] === "reset") resetDemo();
-    else createDemo();
+    if (process.argv[2] === "reset") await resetDemo();
+    else await createDemo();
   } catch (err) {
     console.error(err instanceof Error ? err.message : err);
     process.exit(1);

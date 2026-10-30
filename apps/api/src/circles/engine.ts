@@ -5,6 +5,7 @@ import {
   recipientForCycle,
   recoveryAction,
   transition,
+  type CircleEvent,
   type CycleEvent,
   type HoldInvoiceState,
 } from "@kola/shared";
@@ -138,6 +139,7 @@ export class CycleEngine {
       }
 
       this.move(cycle, { type: "INVOICES_ISSUED" });
+      const contributions = store.contributions(cycle);
       await this.publish({
         type: "cycle_opened",
         circleId,
@@ -145,8 +147,9 @@ export class CycleEngine {
         attempt: cycle.attempt,
         recipient: cycle.recipientPubkey,
         deadlineMs: cycle.deadlineMs,
+        contributions: contributions.map((c) => ({ member: c.memberPubkey, paymentHash: c.paymentHash })),
       });
-      for (const c of store.contributions(cycle)) this.subscribe(coordinator, c.paymentHash);
+      for (const c of contributions) this.subscribe(coordinator, c.paymentHash);
       return this.reload(cycle);
     });
   }
@@ -211,6 +214,7 @@ export class CycleEngine {
       if (state !== c.state) this.deps.store.setContributionState(c.paymentHash, state);
       states.push(state);
     }
+    await this.announceContributions(cycle);
 
     const action = recoveryAction(cycle.state, states);
     switch (action) {
@@ -253,17 +257,8 @@ export class CycleEngine {
     const cycle = store.getCycle(contribution);
     if (!cycle || cycle.state !== "collecting") return;
 
-    if (state !== contribution.state) {
-      store.setContributionState(paymentHash, state);
-      if (state === "ACCEPTED") {
-        await this.publish({
-          type: "contribution_held",
-          circleId: cycle.circleId,
-          cycleIndex: cycle.cycleIndex,
-          member: contribution.memberPubkey,
-        });
-      }
-    }
+    if (state !== contribution.state) store.setContributionState(paymentHash, state);
+    await this.announceContributions(cycle);
 
     if (state === "CANCELED") {
       // Expired or cancelled outside the engine: nothing is settled yet, so refund everyone.
@@ -291,13 +286,8 @@ export class CycleEngine {
       }
       await coordinator.settleHoldInvoice(this.preimage(cycle, c.memberPubkey));
       this.deps.store.setContributionState(c.paymentHash, "SETTLED");
-      await this.publish({
-        type: "contribution_settled",
-        circleId: cycle.circleId,
-        cycleIndex: cycle.cycleIndex,
-        member: c.memberPubkey,
-      });
     }
+    await this.announceContributions(cycle);
     cycle = this.move(cycle, { type: "ALL_SETTLED" });
     await this.payout(coordinator, cycle);
   }
@@ -314,7 +304,7 @@ export class CycleEngine {
     try {
       if (cycle.payoutHash) {
         const previous = await coordinator.lookupPayment(cycle.payoutHash);
-        if (previous?.status === "succeeded") return await this.finishPayout(cycle, pot);
+        if (previous?.status === "succeeded") return await this.finishPayout(cycle, pot, previous.preimage);
         if (previous?.status === "in_flight") return this.scheduleRetry(cycle);
       }
 
@@ -345,7 +335,7 @@ export class CycleEngine {
         maxFeeSat: config.maxPayoutFeeSat,
         timeoutSeconds: 60,
       });
-      if (result.status === "succeeded") return await this.finishPayout(cycle, pot);
+      if (result.status === "succeeded") return await this.finishPayout(cycle, pot, result.preimage);
       this.deps.log.warn({ circleId: cycle.circleId, status: result.status }, "payout not completed; will retry");
     } catch (err) {
       this.deps.log.error({ err, circleId: cycle.circleId }, "payout attempt failed; will retry");
@@ -353,7 +343,7 @@ export class CycleEngine {
     this.scheduleRetry(cycle);
   }
 
-  private async finishPayout(cycle: CycleRow, pot: number): Promise<void> {
+  private async finishPayout(cycle: CycleRow, pot: number, preimage: string): Promise<void> {
     this.move(cycle, { type: "PAYOUT_SUCCEEDED" });
     const circle = this.deps.store.getCircle(cycle.circleId);
     if (circle && cycle.cycleIndex + 1 >= circle.memberCount) this.deps.store.setCircleStatus(circle.id, "completed");
@@ -361,8 +351,11 @@ export class CycleEngine {
       type: "payout_sent",
       circleId: cycle.circleId,
       cycleIndex: cycle.cycleIndex,
+      attempt: cycle.attempt,
       recipient: cycle.recipientPubkey,
       amountSat: pot,
+      paymentHash: cycle.payoutHash ?? "",
+      preimage,
     });
   }
 
@@ -399,6 +392,27 @@ export class CycleEngine {
     });
   }
 
+  /**
+   * Records what LND says about each contribution. Safe to repeat (the publisher
+   * ignores facts it already has), so however a state was learned (subscription,
+   * ticker, or recovery after a crash) the public record ends up complete.
+   */
+  private async announceContributions(cycle: CycleKey): Promise<void> {
+    for (const c of this.deps.store.contributions(cycle)) {
+      const fact = {
+        circleId: c.circleId,
+        cycleIndex: c.cycleIndex,
+        attempt: c.attempt,
+        member: c.memberPubkey,
+        paymentHash: c.paymentHash,
+      };
+      if (c.state === "ACCEPTED" || c.state === "SETTLED") await this.publish({ type: "contribution_held", ...fact });
+      if (c.state === "SETTLED") {
+        await this.publish({ type: "contribution_settled", ...fact, preimage: this.preimage(cycle, c.memberPubkey) });
+      }
+    }
+  }
+
   private subscribe(coordinator: WalletProvider, paymentHash: string): void {
     if (this.subscriptions.has(paymentHash)) return;
     const unsubscribe = coordinator.subscribeInvoice(paymentHash, {
@@ -433,7 +447,7 @@ export class CycleEngine {
     return derivePreimage(this.deps.preimageSecret, { ...key(cycle), memberPubkey });
   }
 
-  private async publish(event: Parameters<EventPublisher["publish"]>[0]): Promise<void> {
+  private async publish(event: CircleEvent): Promise<void> {
     try {
       await this.deps.publisher.publish(event);
     } catch (err) {

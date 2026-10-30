@@ -169,7 +169,7 @@ describe("payments", () => {
 
   it("does not pay twice when a payment already succeeded", async () => {
     const payments = new FakeTransport({}, {
-      [trackPath]: { messages: [{ payment_hash: HASH, status: "SUCCEEDED", fee_sat: "2" }] },
+      [trackPath]: { messages: [{ payment_hash: HASH, status: "SUCCEEDED", fee_sat: "2", payment_preimage: PREIMAGE }] },
     });
     const res = await new LndRestWallet(new FakeTransport(), payments).payInvoice({
       paymentRequest: PAYREQ,
@@ -177,7 +177,7 @@ describe("payments", () => {
       maxFeeSat: 50,
       timeoutSeconds: 30,
     });
-    expect(res).toEqual({ status: "succeeded", paymentHash: HASH, feeSat: 2 });
+    expect(res).toEqual({ status: "succeeded", paymentHash: HASH, feeSat: 2, preimage: PREIMAGE });
     expect(payments.calls.map((c) => c.path)).not.toContain("/v2/router/send");
   });
 
@@ -187,7 +187,7 @@ describe("payments", () => {
       "POST /v2/router/send": {
         messages: [
           { payment_hash: HASH, status: "IN_FLIGHT" },
-          { payment_hash: HASH, status: "SUCCEEDED", fee_sat: "1" },
+          { payment_hash: HASH, status: "SUCCEEDED", fee_sat: "1", payment_preimage: PREIMAGE },
         ],
       },
     });
@@ -197,7 +197,7 @@ describe("payments", () => {
       maxFeeSat: 50,
       timeoutSeconds: 30,
     });
-    expect(res).toEqual({ status: "succeeded", paymentHash: HASH, feeSat: 1 });
+    expect(res).toEqual({ status: "succeeded", paymentHash: HASH, feeSat: 1, preimage: PREIMAGE });
     const send = payments.calls.find((c) => c.path === "/v2/router/send");
     expect(send?.body).toMatchObject({ payment_request: PAYREQ, fee_limit_sat: "50", timeout_seconds: 30 });
     expect(payments.closed).toBeGreaterThan(0);

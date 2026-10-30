@@ -1,6 +1,7 @@
 import {
   ApiErrorBody,
   BalanceResponse,
+  buildCircleEvent,
   CircleListResponse,
   CircleView,
   ClaimResponse,
@@ -94,6 +95,25 @@ export class ApiClient {
 
   openRound(id: string) {
     return this.call("POST", `/circles/${encodeURIComponent(id)}/cycles`, CircleView);
+  }
+
+  /** Signs this member's agreement to the circle's rules, on this device, for the public record. */
+  recordJoin(view: CircleView) {
+    const member = view.members.find((m) => m.isYou)?.pubkey;
+    if (!member) throw new ApiError("not_a_member");
+    const event = this.opts.sign(
+      buildCircleEvent(
+        {
+          type: "circle_joined",
+          circleId: view.id,
+          member,
+          contributionSat: view.contributionSat,
+          memberCount: view.memberCount,
+        },
+        { coordinatorPubkey: view.coordinatorPubkey, nowS: Math.floor(this.nowMs() / 1000) },
+      ),
+    );
+    return this.call("POST", `/circles/${encodeURIComponent(view.id)}/join-record`, CircleView, { event });
   }
 
   contribute(id: string) {

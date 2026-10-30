@@ -11,7 +11,7 @@ Status: **draft**; covers decisions made so far (scaffold + LND wallet provider)
 | Pot (between settle and payout) | Coordinator LND channel balance | Coordinator could withhold payout |
 | Coordinator macaroons | `infra/data/coordinator/kola/*.macaroon` (gitignored, read by API) | See *Keys* below |
 | Hold-invoice preimages | API process memory / DB until settle | Early leak lets a member's payment be settled before everyone has paid |
-| Coordinator Nostr key | `.env` (`COORDINATOR_NSEC`) | Forged circle history |
+| Coordinator Nostr key | `COORDINATOR_NSEC` or owner-only `data/coordinator-nostr.secret` (gitignored) | Forged coordinator statements; can't forge member joins, and proofs of payment still have to match their hashes |
 | Member Nostr keys | Member device, IndexedDB, PIN-encrypted | Impersonation of that member's join/consent events |
 
 ## Keys and least privilege
@@ -75,6 +75,23 @@ wallet; with NWC/mainnet we would add a longer passphrase option and key backup.
 - NIP-98 signatures name the URL the browser used; the API accepts only the
   URLs listed in `PUBLIC_API_URLS`, so a request signed for another host fails.
 
+## Public record (Nostr)
+
+What goes on the relay: pubkeys, amounts in sats, deadlines, payment hashes, and
+preimages only after settlement (each member's preimage is independent, so one
+reveals nothing about the others). Circle names, nicknames, join codes and phone
+numbers never do. Reading it does expose metadata: anyone who has a member's
+pubkey and the relay can see that member's savings activity. Pubkeys are
+per-device pseudonyms, but this is a real limit on a public relay.
+
+**Limits of the audit:** the app learns the coordinator's pubkey from the API, so
+a malicious server could present a different key along with a different record
+to one member. Members comparing keys, or pinning the key in the circle
+invitation, would close this. The record proves what was signed, and hashes and
+proofs prove payments match; it is not itself proof that a payment moved, which
+LND is. The relay port stays on loopback; phones reach it through the web
+server's `/relay` path.
+
 ## Routes
 
 | Route | Auth | Limits | Notes |
@@ -89,6 +106,7 @@ wallet; with NWC/mainnet we would add a longer passphrase option and key backup.
 | `POST /circles` | NIP-98 | global; contribution ≤ `MAX_PAYMENT_SAT` | Creator joins as position 0 |
 | `POST /circles/join` | NIP-98 | global | 6-char code (32-symbol alphabet); idempotent; full circles refuse |
 | `GET /circles`, `GET /circles/:id` | NIP-98 | global | Members only; others get 404 so ids don't reveal circles |
+| `POST /circles/:id/join-record` | NIP-98, member | global; signature, signer = caller, and rules all checked | Publishes the member's own signed agreement |
 | `POST /circles/:id/cycles` | NIP-98, creator only | global | Opens the next round via the engine |
 | `POST /circles/:id/contribute` | NIP-98, member | 10/min; same caps and checks as pay, amount must equal the contribution | Shares the per-member payment lock with `/wallet/pay` |
 
@@ -149,8 +167,11 @@ caps in the API, payout invoices must equal the pot exactly
 | Path injection via invoice/hash in URL | Hashes validated as 64-hex, BOLT11 restricted to bech32 charset before use in paths | Implemented |
 | Secrets in logs | Fastify redaction (invoices, preimages, macaroons, nsecs, names, phones); `no-console` lint rule; env errors name vars, never values | Implemented |
 | Macaroon in error messages | Transport errors carry LND's message only, never headers | Implemented |
+| Coordinator rewrites history | Records are signed and checked on each member's device: signatures, payment hashes committed when a round opens, proofs of payment, pot amount, recipient vs rotation, members' own signed joins | Implemented (`auditCircle`) |
+| Relay outage | Durable outbox retries; money never waits on the relay | Implemented |
 | Prompt injection into AI assistant | Read-only tools, no keys/invoices/preimages in context, untrusted-input framing | Pending |
-| Relay censorship / tampering | Events are signed; clients verify; state rebuildable from LND + relay | Pending |
+| Relay tampering | Altered events fail signature checks and are reported | Implemented |
+| Relay censorship | Partly detected: a payout whose contributions are missing is flagged, but a relay or coordinator hiding a whole round is not detectable from one relay. Publishing to several relays is the next step | Partial |
 | Stolen phone | NIP-49 encrypted key, PIN wait-out after 5 tries, auto-lock; spend caps bound the damage of an unlocked phone | Implemented (see limit above) |
 | Swapped request body (e.g. a different invoice) | Client signs sha256 of the exact body; server rejects mismatches | Implemented |
 | Malicious server response | Web validates every response against shared Zod schemas | Implemented |

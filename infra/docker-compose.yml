@@ -8,6 +8,7 @@ x-lnd: &lnd
   image: lightninglabs/lnd:v0.18.3-beta
   restart: unless-stopped
   depends_on: [bitcoind]
+  stop_grace_period: 60s
   entrypoint:
   - lnd
   - --noseedbackup
@@ -28,6 +29,8 @@ services:
   bitcoind:
     image: polarlightning/bitcoind:27.0
     restart: unless-stopped
+    # Time to write the chain index on stop; a hard kill can lose it (recover with `bitcoind -reindex`).
+    stop_grace_period: 60s
     command:
       - bitcoind
       - -regtest=1

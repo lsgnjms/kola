@@ -86,16 +86,20 @@ function fund(node: string, utxos: number): void {
   }
 }
 
-function openChannel(from: string, to: string, toPubkey: string): void {
-  if (hasChannelTo(from, toPubkey)) {
-    console.log(`  ${from} → ${to}: already open`);
-    return;
-  }
+function connectPeer(from: string, to: string, toPubkey: string): void {
   try {
     exec(from, ["lncli", "--network=regtest", "connect", `${toPubkey}@${to}:9735`]);
   } catch {
     // Already connected.
   }
+}
+
+function openChannel(from: string, to: string, toPubkey: string): void {
+  if (hasChannelTo(from, toPubkey)) {
+    console.log(`  ${from} → ${to}: already open`);
+    return;
+  }
+  connectPeer(from, to, toPubkey);
   lncli(from, "openchannel", `--node_key=${toPubkey}`, `--local_amt=${CHANNEL_SAT}`);
   console.log(`  ${from} → ${to}: opening ${CHANNEL_SAT} sat`);
 }
@@ -160,7 +164,8 @@ async function main(): Promise<void> {
     }
   });
   minerAddress = btc("getnewaddress");
-  if (Number(btc("getblockcount")) < 101) mine(101);
+  // Always at least one fresh block: LND reports "not synced" while the newest block is hours old.
+  mine(Math.max(1, 101 - Number(btc("getblockcount"))));
 
   console.log("Waiting for LND nodes…");
   for (const node of nodes) await waitSynced(node);
@@ -179,6 +184,9 @@ async function main(): Promise<void> {
     openChannel(COORDINATOR, m, pubkey(m));
   }
   mine(6);
+
+  // After a Docker restart containers get new IPs, so LND can't reach the addresses it saved.
+  for (const m of MEMBERS) connectPeer(m, COORDINATOR, coordinatorPubkey);
 
   console.log("Waiting for channels to become active…");
   for (const node of nodes) {
@@ -201,8 +209,17 @@ async function main(): Promise<void> {
   for (const m of MEMBERS) bakeMacaroon(m, "wallet", MEMBER_WALLET_URIS);
 
   console.log("Creating the demo circle…");
-  createDemo();
-  console.log("\nSeed complete: nodes funded, channels active, demo circle ready.");
+  try {
+    await createDemo();
+    console.log("\nSeed complete: nodes funded, channels active, demo circle ready.");
+  } catch (err) {
+    // The nodes are fine; only the demo circle couldn't be created (wallets in use).
+    console.warn(`\nNodes funded and channels active, but no demo circle: ${err instanceof Error ? err.message : err}`);
+  }
+
+  // Regtest writes its chain index rarely, so an unclean Docker or PC shutdown can lose it.
+  // This RPC forces a flush. Only the seed mines blocks, so the chain is safe from here on.
+  btc("gettxoutsetinfo");
 }
 
 main().catch((err: unknown) => {

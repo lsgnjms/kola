@@ -63,7 +63,13 @@ const Env = z.object({
     .regex(/^[0-9a-f]{64}$/)
     .optional()
     .or(z.literal("").transform(() => undefined)),
-  NOSTR_RELAY_URL: z.string().url().default("ws://localhost:7777"),
+  /** 32-byte hex key signing the public record. If unset, generated next to the database. */
+  COORDINATOR_NSEC: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/)
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
+  NOSTR_RELAY_URL: z.string().url().default("ws://127.0.0.1:7777"),
   COORDINATOR_LND_REST_URL: z.string().url().default("https://localhost:8081"),
   COORDINATOR_LND_TLS_CERT_PATH: RepoPath.default("infra/data/coordinator/tls.cert"),
   COORDINATOR_INVOICE_MACAROON_PATH: RepoPath.default("infra/data/coordinator/kola/invoice.macaroon"),

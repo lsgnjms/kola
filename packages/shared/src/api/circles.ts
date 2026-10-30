@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { CycleState, MAX_MEMBERS, MIN_MEMBERS } from "../schemas.js";
+import { CycleState, MAX_MEMBERS, MIN_MEMBERS, PubkeyHex } from "../schemas.js";
 
 /** Pseudonymous name shown to the circle. Stored on the server only, never published. */
 export const Nickname = z.string().trim().min(1).max(24);
@@ -32,6 +32,7 @@ export type ContributionStatus = z.infer<typeof ContributionStatus>;
 
 export const CircleMemberView = z.object({
   position: z.number().int().nonnegative(),
+  pubkey: PubkeyHex,
   nickname: z.string(),
   isYou: z.boolean(),
   isCreator: z.boolean(),
@@ -57,11 +58,18 @@ export const CircleView = z.object({
   status: CircleStatus,
   joinCode: z.string(),
   isCreator: z.boolean(),
+  /** Signs the circle's public record. */
+  coordinatorPubkey: PubkeyHex,
+  /** This member's signed agreement to the rules is in the public record. */
+  joinRecorded: z.boolean(),
   members: z.array(CircleMemberView),
   completedCycles: z.number().int().nonnegative(),
   currentCycle: CycleView.nullable(),
 });
 export type CircleView = z.infer<typeof CircleView>;
+
+/** A member's signed `circle_joined` event. Checked in full by the API before it is published. */
+export const RecordJoinRequest = z.object({ event: z.unknown() }).strict();
 
 export const CircleSummary = z.object({
   id: z.string().uuid(),

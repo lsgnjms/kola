@@ -1,9 +1,12 @@
 import { randomInt, randomUUID } from "node:crypto";
 import {
+  auditCircle,
   CreateCircleRequest,
+  eventKey,
   JOIN_CODE_ALPHABET,
   JoinCircleRequest,
   potSat,
+  RecordJoinRequest,
   type CircleView,
   type ContributionStatus,
   type HoldInvoiceState,
@@ -13,6 +16,7 @@ import { z } from "zod";
 import { memberPubkey, nostrAuth } from "../auth/nostrAuth.js";
 import { contribute } from "../circles/contribute.js";
 import { EngineError, type CycleEngine } from "../circles/engine.js";
+import type { NostrPublisher } from "../circles/publisher.js";
 import type { CircleRow, CircleStore } from "../circles/store.js";
 import type { Env } from "../env.js";
 import type { WalletProvider } from "../wallet/WalletProvider.js";
@@ -22,6 +26,7 @@ export interface CircleRouteDeps extends Pick<WalletRouteDeps, "bindings" | "wal
   env: Env;
   store: CircleStore;
   engine: CycleEngine;
+  publisher: NostrPublisher;
   coordinator: () => Promise<WalletProvider>;
   nowMs: () => number;
 }
@@ -90,7 +95,10 @@ export async function circleRoutes(app: FastifyInstance, deps: CircleRouteDeps):
     }
     // Synchronous SQLite: nothing can interleave between the check above and these writes.
     store.addMember(circle.id, me, body.data.nickname, deps.nowMs());
-    if (members.length + 1 === circle.memberCount) store.setCircleStatus(circle.id, "active");
+    if (members.length + 1 === circle.memberCount) {
+      store.setCircleStatus(circle.id, "active");
+      await announceDefinition(circle);
+    }
     return view(store.getCircle(circle.id) ?? circle, me);
   });
 
@@ -112,6 +120,33 @@ export async function circleRoutes(app: FastifyInstance, deps: CircleRouteDeps):
     const circle = myCircle(request.params, memberPubkey(request), reply);
     if (!circle) return;
     return view(circle, memberPubkey(request));
+  });
+
+  /** Publishes the member's own signed agreement to the rules. The server can't forge these. */
+  app.post("/circles/:id/join-record", async (request, reply) => {
+    const me = memberPubkey(request);
+    const circle = myCircle(request.params, me, reply);
+    if (!circle) return;
+    const body = RecordJoinRequest.safeParse(request.body);
+    if (!body.success) return reply.code(400).send({ error: "invalid_request" });
+
+    const { entries } = auditCircle([body.data.event], {
+      circleId: circle.id,
+      coordinatorPubkey: deps.publisher.coordinatorPubkey,
+    });
+    const event = entries[0]?.event;
+    if (
+      event?.type !== "circle_joined" ||
+      event.member !== me ||
+      event.contributionSat !== circle.contributionSat ||
+      event.memberCount !== circle.memberCount
+    ) {
+      return reply.code(400).send({ error: "invalid_request" });
+    }
+    // auditCircle checked the shape and the signature, so this is a complete signed event.
+    deps.publisher.addSigned(eventKey(event), body.data.event as Parameters<NostrPublisher["addSigned"]>[1]);
+    if (circle.status !== "forming") await announceDefinition(circle);
+    return view(circle, me);
   });
 
   /** Opens the next round. Only the creator can, so a member can't spam rounds. */
@@ -159,6 +194,22 @@ export async function circleRoutes(app: FastifyInstance, deps: CircleRouteDeps):
     },
   );
 
+  /** Idempotent. Pubkeys and amounts only: the circle's name and nicknames stay off the relay. */
+  async function announceDefinition(circle: CircleRow): Promise<void> {
+    await deps.publisher.publish({
+      type: "circle_defined",
+      circleId: circle.id,
+      definition: {
+        id: circle.id,
+        contributionSat: circle.contributionSat,
+        periodSeconds: circle.periodSeconds,
+        memberCount: circle.memberCount,
+        coordinatorPubkey: deps.publisher.coordinatorPubkey,
+        rotation: store.members(circle.id).map((m) => m.pubkey),
+      },
+    });
+  }
+
   function myCircle(params: unknown, me: string, reply: FastifyReply): CircleRow | null {
     const parsed = CircleIdParams.safeParse(params);
     const circle = parsed.success ? store.getCircle(parsed.data.id) : null;
@@ -181,8 +232,19 @@ export async function circleRoutes(app: FastifyInstance, deps: CircleRouteDeps):
       status: circle.status,
       joinCode: circle.joinCode,
       isCreator: circle.creatorPubkey === me,
+      coordinatorPubkey: deps.publisher.coordinatorPubkey,
+      joinRecorded: deps.publisher.has(
+        eventKey({
+          type: "circle_joined",
+          circleId: circle.id,
+          member: me,
+          contributionSat: circle.contributionSat,
+          memberCount: circle.memberCount,
+        }),
+      ),
       members: members.map((m) => ({
         position: m.position,
+        pubkey: m.pubkey,
         nickname: m.nickname,
         isYou: m.pubkey === me,
         isCreator: m.pubkey === circle.creatorPubkey,

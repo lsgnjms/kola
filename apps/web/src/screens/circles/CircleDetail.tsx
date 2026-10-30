@@ -1,11 +1,13 @@
 import type { CircleView, ContributeResponse } from "@kola/shared";
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import type { ApiClient } from "../../api/client.js";
 import { copyText } from "../../clipboard.js";
 import { formatSat } from "../../format.js";
 import { useI18n } from "../../i18n/index.js";
 import { ErrorMessage, Screen } from "../../ui.js";
 import { canPay, canStartRound, formatCountdown, isLive, memberAt, myContribution, nextRoundNumber } from "./model.js";
+
+const AuditLog = lazy(() => import("./AuditLog.js"));
 
 /** Refresh while a round is moving; a GET every few seconds is cheap on 3G. */
 const LIVE_REFRESH_MS = 3000;
@@ -19,9 +21,18 @@ export function CircleDetail({ api, id, onBack }: { api: ApiClient; id: string; 
   const [copied, setCopied] = useState(false);
   const [now, setNow] = useState(Date.now());
 
+  const [showRecord, setShowRecord] = useState(false);
+  const joinRecordTried = useRef(false);
+
   const load = useCallback(async () => {
     try {
-      setView(await api.getCircle(id));
+      const next = await api.getCircle(id);
+      setView(next);
+      // Add our signed agreement to the record. Quietly retried next visit: it never blocks money.
+      if (!next.joinRecorded && !joinRecordTried.current) {
+        joinRecordTried.current = true;
+        await api.recordJoin(next).catch(() => undefined);
+      }
     } catch (err) {
       setError(err);
     }
@@ -164,6 +175,15 @@ export function CircleDetail({ api, id, onBack }: { api: ApiClient; id: string; 
       {view.status === "active" && !view.isCreator && !isLive(view) && <p>{t("circle.waitOrganizer")}</p>}
       {view.status === "completed" && <p className="notice">{t("circle.complete")}</p>}
       {error !== null && <ErrorMessage error={error} />}
+
+      <button type="button" className="secondary" onClick={() => setShowRecord((s) => !s)}>
+        {t("audit.open")}
+      </button>
+      {showRecord && (
+        <Suspense fallback={<p aria-busy="true">{t("common.loading")}</p>}>
+          <AuditLog view={view} />
+        </Suspense>
+      )}
 
       <h3>{t("circle.members")}</h3>
       <ol className="members">

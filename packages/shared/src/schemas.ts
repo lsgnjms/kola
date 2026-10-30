@@ -19,8 +19,6 @@ export const MAX_MEMBERS = 50;
 export const CircleDefinition = z
   .object({
     id: z.string().uuid(),
-    /** Pseudonymous; never a real name or phone number (published on Nostr). */
-    name: z.string().trim().min(1).max(60),
     contributionSat: AmountSat,
     periodSeconds: z.number().int().positive(),
     memberCount: z.number().int().min(MIN_MEMBERS).max(MAX_MEMBERS),

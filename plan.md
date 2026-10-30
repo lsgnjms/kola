@@ -37,7 +37,7 @@ One circle = ~10 members × 52 weekly contributions = 520 payments/year. A singl
 - [x] Wallet: balance, create invoice (QR + copy), pay invoice, transaction history
 - [x] Circle: create (name, amount in sats, period, member count), invite via link/code, join, fixed rotation order
 - [x] Cycle engine: open cycle → issue hold invoices → track HTLCs → settle all + pay recipient, or cancel all on deadline
-- [ ] Nostr: publish circle, join, contribution, payout and cancellation events; in-app audit log that verifies signatures
+- [x] Nostr: publish circle, join, contribution, payout and cancellation events; in-app audit log that verifies signatures
 - [ ] AI: Q&A over circle state + generated reminder messages
 - [ ] One-command setup, seed data, a demo circle that completes a full rotation in minutes
 - [ ] README, architecture diagram, threat model, 3-minute demo video
@@ -95,15 +95,15 @@ Coordinator holds funds only for the seconds between settle and payout.
 
 > **Hold-time caveat:** held HTLCs lock liquidity along the route and are bounded by CLTV expiry. Demo uses windows of minutes. Production should keep contribution windows short (≤ 24h) and document this as a known constraint.
 
-### Nostr event design (draft, verify kinds against the NIP registry before finalizing)
+### Nostr event design (kinds checked against the NIP registry on 2026-10-30)
 | Event | Kind (proposed) | Signed by | Content |
 |---|---|---|---|
-| Circle definition | addressable `3xxxx` | creator | name, amount, period, size, rotation order, coordinator pubkey |
-| Join | regular | member | circle `a` tag, acceptance of rules |
-| Cycle opened | regular | coordinator | cycle #, recipient, deadline, payment hashes |
-| Contribution held / settled | regular | coordinator | cycle #, member pubkey, payment hash |
-| Payout sent | regular | coordinator | cycle #, recipient, amount, payment hash, preimage |
-| Cycle cancelled | regular | coordinator | cycle #, missing members |
+| Circle definition | addressable `33501` | coordinator | amount, period, size, rotation order, coordinator pubkey (no name) |
+| Join | `3501` | member | circle `a` tag, acceptance of rules |
+| Cycle opened | `3502` | coordinator | cycle #, recipient, deadline, payment hashes |
+| Contribution held / settled | `3503` / `3504` | coordinator | cycle #, member pubkey, payment hash; preimage once settled |
+| Payout sent | `3505` | coordinator | cycle #, recipient, amount, payment hash, preimage |
+| Cycle cancelled | `3506` | coordinator | cycle #, missing members |
 
 No names, phone numbers or amounts in fiat on the relay. Display names stay local or are pseudonymous.
 

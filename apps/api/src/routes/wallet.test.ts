@@ -15,7 +15,7 @@ const HASH = "ab".repeat(32);
 class FakeWallet implements WalletProvider {
   balanceSat = 500_000;
   decoded: DecodedInvoice = { paymentHash: HASH, amountSat: 1000, expiresAtMs: NOW + 600_000, network: "regtest" };
-  payResult: PaymentResult = { status: "succeeded", paymentHash: HASH, feeSat: 1 };
+  payResult: PaymentResult = { status: "succeeded", paymentHash: HASH, feeSat: 1, preimage: "cd".repeat(32) };
   paid: string[] = [];
   history: WalletTransaction[] = [];
 
