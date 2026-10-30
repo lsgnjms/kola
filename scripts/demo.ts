@@ -4,7 +4,8 @@
  * backup code (PIN 123456) to data/demo/ so demo phones can "Restore from a backup".
  *
  *   pnpm demo         create it (no-op if it already exists)
- *   pnpm demo:reset   wipe circles + wallet links, then create it (stop `pnpm dev` first)
+ *   pnpm demo:reset   wipe circles + wallet links, recreate it with the same members and
+ *                     backup codes, so phones stay logged in (stop `pnpm dev` first)
  *
  * Regtest throwaway keys only. Never use this PIN or these codes for anything real.
  */
@@ -50,9 +51,12 @@ export async function createDemo(): Promise<void> {
     const now = Date.now();
     const circleId = randomUUID();
     mkdirSync(demoDir, { recursive: true });
+    // Keys are reused across resets, so codes already pasted into phones keep working.
     const members = MEMBERS.map((nickname) => {
-      const secretKey = generateSecretKey();
-      return { nickname, secretKey, pubkey: getPublicKey(secretKey), backup: nip49.encrypt(secretKey, DEMO_PIN, 15) };
+      const file = join(demoDir, `${nickname.toLowerCase()}.txt`);
+      const existing = existsSync(file) ? readFileSync(file, "utf8").trim() : null;
+      const secretKey = existing ? nip49.decrypt(existing, DEMO_PIN) : generateSecretKey();
+      return { nickname, secretKey, pubkey: getPublicKey(secretKey), backup: existing ?? nip49.encrypt(secretKey, DEMO_PIN, 15) };
     });
 
     store.createCircle({
@@ -129,7 +133,6 @@ export async function resetDemo(): Promise<void> {
       throw err;
     }
   }
-  rmSync(join(dirname(env.DB_PATH), "demo"), { recursive: true, force: true });
   console.log("Cleared circles and wallet links.");
   await createDemo();
 }
