@@ -1,9 +1,8 @@
 /**
  * Nostr event kinds used by Kola. Defined once here; web and api both import them.
  *
- * TODO(nostr milestone): check these against the NIP registry
- * (https://github.com/nostr-protocol/nips#event-kinds) for collisions before
- * the first public relay deployment.
+ * Checked against the NIP registry (https://github.com/nostr-protocol/nips#event-kinds)
+ * on 2026-10-30: none of these numbers is taken. Recheck before a public relay deployment.
  */
 export const KIND = {
   /** Addressable (30000–39999): replaceable circle definition keyed by `d` = circle id. */
@@ -18,3 +17,9 @@ export const KIND = {
 } as const;
 
 export type KolaKind = (typeof KIND)[keyof typeof KIND];
+
+/** Standard kinds from other NIPs that Kola uses. */
+export const NIP_KIND = {
+  /** NIP-98 HTTP Auth. */
+  HTTP_AUTH: 27_235,
+} as const;

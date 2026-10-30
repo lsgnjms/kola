@@ -16,31 +16,66 @@ export interface WalletProvider {
     memo: string;
   }): Promise<{ paymentRequest: string }>;
 
+  /** Settles the hold invoice for sha256(preimage). Succeeds if it was already settled. */
   settleHoldInvoice(preimageHex: string): Promise<void>;
+  /** Cancels a hold invoice. Succeeds if it was already cancelled; throws if it was settled. */
   cancelHoldInvoice(paymentHash: PaymentHashHex): Promise<void>;
   lookupInvoiceState(paymentHash: PaymentHashHex): Promise<HoldInvoiceState>;
 
   /** Streams state changes for one invoice. Returns an unsubscribe function. */
   subscribeInvoice(
     paymentHash: PaymentHashHex,
-    onState: (state: HoldInvoiceState) => void,
+    handlers: { onState: (state: HoldInvoiceState) => void; onError: (err: Error) => void },
   ): () => void;
 
-  /** Decodes a BOLT11 invoice. Callers check amount, expiry and network before paying. */
+  /** Regular (non-hold) invoice, e.g. a member receiving into their wallet or a payout invoice. */
+  createInvoice(input: {
+    amountSat: number;
+    expirySeconds: number;
+    memo: string;
+  }): Promise<{ paymentRequest: string; paymentHash: PaymentHashHex }>;
+
+  /** Decodes a BOLT11 invoice. Callers check it with `checkInvoiceBeforePay` before paying. */
   decodeInvoice(paymentRequest: string): Promise<DecodedInvoice>;
 
-  payInvoice(input: { paymentRequest: string; maxFeeSat: number }): Promise<PaymentResult>;
+  /** Pays an invoice. Returns the existing result instead of paying twice. */
+  payInvoice(input: {
+    paymentRequest: string;
+    paymentHash: PaymentHashHex;
+    maxFeeSat: number;
+    timeoutSeconds: number;
+  }): Promise<PaymentResult>;
   lookupPayment(paymentHash: PaymentHashHex): Promise<PaymentResult | null>;
+
+  /** Spendable balance across open channels. */
+  getBalanceSat(): Promise<{ localSat: number; remoteSat: number }>;
+
+  /** Outgoing payments (including in-flight) created at or after `sinceMs`, newest first. */
+  listPayments(input: { sinceMs: number; limit: number }): Promise<WalletTransaction[]>;
+  /** Settled incoming invoices, newest first. */
+  listReceived(input: { limit: number }): Promise<WalletTransaction[]>;
 }
+
+export interface WalletTransaction {
+  direction: "in" | "out";
+  paymentHash: PaymentHashHex;
+  amountSat: number;
+  feeSat: number;
+  status: "pending" | "complete" | "failed";
+  timestampMs: number;
+}
+
+export type Network = "regtest" | "signet" | "testnet" | "mainnet";
 
 export interface DecodedInvoice {
   paymentHash: PaymentHashHex;
+  /** 0 for amount-less invoices; callers must reject those. */
   amountSat: number;
   expiresAtMs: number;
-  network: "regtest" | "testnet" | "signet" | "mainnet";
+  network: Network;
 }
 
 export type PaymentResult =
-  | { status: "succeeded"; paymentHash: PaymentHashHex; feeSat: number }
+  | { status: "succeeded"; paymentHash: PaymentHashHex; feeSat: number; /** Proof of payment. */ preimage: string }
   | { status: "in_flight"; paymentHash: PaymentHashHex }
   | { status: "failed"; paymentHash: PaymentHashHex; reason: string };

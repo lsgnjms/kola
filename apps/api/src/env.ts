@@ -1,8 +1,38 @@
+import { isAbsolute, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { z } from "zod";
+
+const REPO_ROOT = fileURLToPath(new URL("../../../", import.meta.url));
+
+/** File paths in .env are relative to the repo root, whatever the process cwd. */
+const RepoPath = z
+  .string()
+  .min(1)
+  .transform((p) => (p === ":memory:" || isAbsolute(p) ? p : resolve(REPO_ROOT, p)));
+
+/**
+ * "alice=https://localhost:8082,bob=…". Cert and macaroon paths follow the
+ * layout the regtest stack and seed script produce under infra/data/<name>/.
+ */
+const MemberNodes = z
+  .string()
+  .transform((s) => s.split(",").map((e) => e.trim()).filter(Boolean))
+  .pipe(z.array(z.string().regex(/^[a-z0-9-]+=https:\/\/\S+$/)))
+  .transform((entries) =>
+    entries.map((entry) => {
+      const [name = "", restUrl = ""] = entry.split("=");
+      return {
+        name,
+        restUrl,
+        tlsCertPath: resolve(REPO_ROOT, "infra/data", name, "tls.cert"),
+        macaroonPath: resolve(REPO_ROOT, "infra/data", name, "kola/wallet.macaroon"),
+      };
+    }),
+  );
 
 const Env = z.object({
   API_PORT: z.coerce.number().int().positive().default(3000),
-  API_HOST: z.string().default("0.0.0.0"),
+  API_HOST: z.string().default("127.0.0.1"),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),
   CORS_ORIGINS: z
     .string()
@@ -11,7 +41,39 @@ const Env = z.object({
   MAX_PAYMENT_SAT: z.coerce.number().int().positive().default(100_000),
   MAX_DAILY_SPEND_SAT: z.coerce.number().int().positive().default(500_000),
   MAX_PAYOUT_FEE_SAT: z.coerce.number().int().nonnegative().default(50),
-  NOSTR_RELAY_URL: z.string().url().default("ws://localhost:7777"),
+  /** The API's URL as the browser sees it; NIP-98 events are signed over it. */
+  PUBLIC_API_URLS: z
+    .string()
+    .default("http://localhost:5173/api")
+    .transform((s) => s.split(",").map((u) => u.trim()).filter(Boolean))
+    .pipe(z.array(z.string().url()).min(1)),
+  BITCOIN_NETWORK: z.enum(["regtest", "signet", "testnet", "mainnet"]).default("regtest"),
+  DB_PATH: RepoPath.default("data/kola.sqlite"),
+  MEMBER_NODES: MemberNodes.default(
+    "alice=https://localhost:8082,bob=https://localhost:8083,carol=https://localhost:8084",
+  ),
+  /** How long members have to pay their share once a round opens (demo: minutes; production ≤ 24h). */
+  CONTRIBUTION_WINDOW_SECONDS: z.coerce.number().int().min(30).max(24 * 3600).default(300),
+  /**
+   * 32-byte hex key that hold-invoice preimages are derived from. If unset, one is
+   * generated next to the database on first start. Never log or commit it.
+   */
+  COORDINATOR_PREIMAGE_SECRET: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/)
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
+  /** 32-byte hex key signing the public record. If unset, generated next to the database. */
+  COORDINATOR_NSEC: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/)
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
+  NOSTR_RELAY_URL: z.string().url().default("ws://127.0.0.1:7777"),
+  COORDINATOR_LND_REST_URL: z.string().url().default("https://localhost:8081"),
+  COORDINATOR_LND_TLS_CERT_PATH: RepoPath.default("infra/data/coordinator/tls.cert"),
+  COORDINATOR_INVOICE_MACAROON_PATH: RepoPath.default("infra/data/coordinator/kola/invoice.macaroon"),
+  COORDINATOR_PAYOUT_MACAROON_PATH: RepoPath.default("infra/data/coordinator/kola/payout.macaroon"),
   // Optional: without it the assistant uses templated answers.
   ANTHROPIC_API_KEY: z
     .string()

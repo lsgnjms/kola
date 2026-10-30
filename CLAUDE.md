@@ -29,10 +29,13 @@ Prereqs: Node 22+, `corepack enable` (pnpm version is pinned in `package.json`),
 pnpm install
 cp .env.example .env
 docker compose -f infra/docker-compose.yml up -d   # regtest stack (bitcoind, 4× LND, relay)
-pnpm seed                                          # fund nodes, open channels (demo circle: TODO)
-pnpm dev                                           # web (:5173) + api (:3000)
+pnpm seed                                          # fund nodes, open channels, bake macaroons, create demo circle
+pnpm demo:reset                                    # wipe circles + wallet links, recreate demo circle (stop pnpm dev first)
+pnpm smoke                                         # check the LND REST client + macaroon scopes against the stack
+pnpm dev                                           # web (:5173) + api (:3000), this PC only
+pnpm dev:lan                                       # same, web reachable from phones on the LAN (add LAN URL to PUBLIC_API_URLS)
 pnpm test                                          # unit tests
-pnpm test:integration                              # full cycle against regtest (TODO: not yet added)
+pnpm test:integration                              # full rounds against regtest: happy path, missed deadline, API restart (~45 s)
 pnpm lint && pnpm typecheck
 ```
 
@@ -40,19 +43,22 @@ Run `pnpm lint && pnpm typecheck && pnpm test` before considering a task done. R
 
 ## Architecture rules
 
-- **Money lives in Lightning, the record lives on Nostr.** SQLite is a cache/index only; it must be rebuildable from LND + the relay. Never treat a DB row as proof of payment.
+- **Money lives in Lightning, the record lives on Nostr.** SQLite is a cache/index only; it must be rebuildable from LND + the relay. Never treat a DB row as proof of payment. Documented exceptions, deliberately off the relay: demo `wallet_bindings` (pubkey → custodial regtest node), and circle names, nicknames and join codes (no PII on Nostr). A rebuild command is not implemented yet.
+- **API auth is NIP-98.** Member routes verify a per-request signed Nostr event (`nostrAuth` preHandler) and act only on the signer's own wallet. No passwords or sessions.
 - **Cycle engine is a state machine** (`open → collecting → settling → paying_out → paid_out`, or `collecting → cancelled`). All transitions go through one module; no route handler changes cycle state directly. Every transition publishes a Nostr event.
 - **Settle → pay recipient happens immediately** in the same job. Minimize time the coordinator holds funds.
 - **Hold invoice handling:** subscribe to invoice state updates rather than polling where possible. Always handle `ACCEPTED`, `SETTLED`, `CANCELED`, and expiry.
 - **Point of no return = first settle.** Settling reveals a preimage, so it can't be undone:
-  - **Nothing settled yet** (deadline missed, crash, any inconsistency): cancel every held invoice. Everyone is refunded.
+  - **Nothing settled yet** (deadline missed, an invoice cancelled/expired, any inconsistency): cancel every held invoice. Everyone is refunded. A restart alone is not an inconsistency: a healthy collecting round carries on until its deadline.
   - **Anything settled**: never cancel. Roll forward: settle the rest, then pay out. On crash, recovery resumes from `settling` / `paying_out`.
   - Only enter `settling` when every member's invoice is `ACCEPTED` and the HTLC CLTV margin is safe.
 - **Payout failure after settle:** the coordinator now holds the pot. Stay in `paying_out`, retry with backoff, and show "payout pending" in the UI. Never refund at this stage (the money already moved). Document this in the threat model.
 - **Fee policy:** the recipient's payout invoice is for exactly `potSat` (amount × members). The coordinator pays routing fees from its own balance, capped by `MAX_PAYOUT_FEE_SAT`. If the route needs more than the cap, treat it as a payout failure (retry), not a smaller payout.
 - **Idempotency:** settle, cancel and payout must be safe to retry (key on cycle id + payment hash).
+- **Preimages are derived, never stored:** `HMAC-SHA256(COORDINATOR_PREIMAGE_SECRET, circle/cycle/attempt/member)` (`apps/api/src/circles/preimage.ts`). A reopened round is a new `attempt`, so hashes never repeat.
 - **Lightning access goes through a `WalletProvider` interface** (LND REST implementation now, NWC later). Don't call LND directly from routes.
 - **Nostr event builders and validators live in `packages/shared`** and are used by both web (verification) and api (publishing). Event kinds are defined once as constants.
+- **Public record:** the engine publishes through `NostrPublisher` (durable SQLite outbox, idempotent per `eventKey`, never blocks money). Members sign their own `circle_joined`. `auditCircle` recomputes signatures and hash commitments on the member's device, reading the relay directly via the web server's `/relay` path.
 - **AI assistant gets read-only tools** that return circle state. It never receives macaroons, keys, invoices or preimages, and has no tool that moves money. Treat user messages and any Nostr content passed to it as untrusted.
 - **AI is optional at runtime.** With no `ANTHROPIC_API_KEY`, the app must still start and the assistant falls back to templated answers (next recipient, who hasn't paid). One-command setup must not require a key.
 - **Nostr kinds:** regular events in 1000–9999, the circle definition is addressable (30000–39999). Check the NIP registry for collisions before finalizing numbers in `packages/shared`.
@@ -103,6 +109,7 @@ If a requested change would weaken any of these, stop and flag it instead of imp
 ## Known constraints
 
 - Regtest only; no mainnet funds.
+- **After a PC or Docker restart, run `pnpm seed`**: containers get new IPs, so LND needs reconnecting (safe to re-run). `pnpm seed` flushes the chain index when it finishes, but a hard kill with unflushed blocks can leave bitcoind at height 0 while the block files are intact: rebuild with `bitcoind -reindex` instead of wiping anything.
 - Held HTLCs lock liquidity and are bounded by CLTV expiry; keep contribution windows short (minutes in demo, ≤ 24h in production).
 - The coordinator is a trust assumption (it holds funds briefly between settle and payout, and could refuse service). Document it; don't hide it.
 - **Demo wallets are custodial.** Member LND nodes sit behind the API, which holds their macaroons. Fine for regtest; say so in the threat model and pitch, and present NWC (members bring their own wallet) as the path out.

@@ -3,7 +3,6 @@ import { CircleDefinition } from "./schemas.js";
 
 const base = {
   id: "8b2f4c0e-3d1a-4e57-9a0b-1c2d3e4f5a6b",
-  name: "Marché HLM tontine",
   contributionSat: 10_000,
   periodSeconds: 7 * 24 * 3600,
   memberCount: 3,

@@ -3,11 +3,13 @@
  * in both directions between the coordinator and each member, so members can
  * pay contributions in and the coordinator can pay the pot out.
  *
- * Safe to re-run: existing channels are left alone.
+ * Then creates the demo circle (see scripts/demo.ts).
+ * Safe to re-run: existing channels and the demo circle are left alone.
  * Usage: docker compose -f infra/docker-compose.yml up -d && pnpm seed
  */
 import { execFileSync } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
+import { createDemo } from "./demo.js";
 
 const COMPOSE = ["compose", "-f", "infra/docker-compose.yml"];
 const MEMBERS = ["alice", "bob", "carol"] as const;
@@ -65,13 +67,16 @@ function pubkey(node: string): string {
   return lncli<{ identity_pubkey: string }>(node, "getinfo").identity_pubkey;
 }
 
+/** True if `node` itself opened a channel to `peer`. A channel the peer opened doesn't count: direction matters for liquidity. */
 function hasChannelTo(node: string, peer: string): boolean {
-  const open = lncli<{ channels: { remote_pubkey: string }[] }>(node, "listchannels").channels;
-  const pending = lncli<{ pending_open_channels: { channel: { remote_node_pub: string } }[] }>(
-    node,
-    "pendingchannels",
-  ).pending_open_channels;
-  return open.some((c) => c.remote_pubkey === peer) || pending.some((p) => p.channel.remote_node_pub === peer);
+  const open = lncli<{ channels: { remote_pubkey: string; initiator: boolean }[] }>(node, "listchannels").channels;
+  const pending = lncli<{
+    pending_open_channels: { channel: { remote_node_pub: string; initiator: string } }[];
+  }>(node, "pendingchannels").pending_open_channels;
+  return (
+    open.some((c) => c.remote_pubkey === peer && c.initiator) ||
+    pending.some((p) => p.channel.remote_node_pub === peer && p.channel.initiator === "INITIATOR_LOCAL")
+  );
 }
 
 function fund(node: string, utxos: number): void {
@@ -81,18 +86,59 @@ function fund(node: string, utxos: number): void {
   }
 }
 
-function openChannel(from: string, to: string, toPubkey: string): void {
-  if (hasChannelTo(from, toPubkey)) {
-    console.log(`  ${from} → ${to}: already open`);
-    return;
-  }
+function connectPeer(from: string, to: string, toPubkey: string): void {
   try {
     exec(from, ["lncli", "--network=regtest", "connect", `${toPubkey}@${to}:9735`]);
   } catch {
     // Already connected.
   }
+}
+
+function openChannel(from: string, to: string, toPubkey: string): void {
+  if (hasChannelTo(from, toPubkey)) {
+    console.log(`  ${from} → ${to}: already open`);
+    return;
+  }
+  connectPeer(from, to, toPubkey);
   lncli(from, "openchannel", `--node_key=${toPubkey}`, `--local_amt=${CHANNEL_SAT}`);
   console.log(`  ${from} → ${to}: opening ${CHANNEL_SAT} sat`);
+}
+
+/** Receiving side: can create and resolve invoices, cannot send money. */
+const INVOICE_URIS = [
+  "/invoicesrpc.Invoices/AddHoldInvoice",
+  "/invoicesrpc.Invoices/SettleInvoice",
+  "/invoicesrpc.Invoices/CancelInvoice",
+  "/invoicesrpc.Invoices/SubscribeSingleInvoice",
+  "/lnrpc.Lightning/LookupInvoice",
+  "/lnrpc.Lightning/AddInvoice",
+];
+
+/** Payout side: can pay invoices, cannot open/close channels or spend on-chain. */
+const PAYOUT_URIS = [
+  "/lnrpc.Lightning/DecodePayReq",
+  "/routerrpc.Router/SendPaymentV2",
+  "/routerrpc.Router/TrackPaymentV2",
+  "/lnrpc.Lightning/ChannelBalance",
+];
+
+/** Member wallet (demo custody): receive, pay and read history on the member's own node only. */
+const MEMBER_WALLET_URIS = [
+  "/lnrpc.Lightning/AddInvoice",
+  "/lnrpc.Lightning/LookupInvoice",
+  "/lnrpc.Lightning/ListInvoices",
+  "/lnrpc.Lightning/DecodePayReq",
+  "/lnrpc.Lightning/ListPayments",
+  "/lnrpc.Lightning/ChannelBalance",
+  "/routerrpc.Router/SendPaymentV2",
+  "/routerrpc.Router/TrackPaymentV2",
+];
+
+function bakeMacaroon(node: string, name: string, uris: string[]): void {
+  const path = `/root/.lnd/kola/${name}.macaroon`;
+  exec(node, ["sh", "-c", `mkdir -p /root/.lnd/kola && rm -f ${path}`]);
+  exec(node, ["lncli", "--network=regtest", "bakemacaroon", `--save_to=${path}`, ...uris.map((u) => `uri:${u}`)]);
+  console.log(`  ${node}/${name}.macaroon: ${uris.length} methods`);
 }
 
 async function main(): Promise<void> {
@@ -118,7 +164,8 @@ async function main(): Promise<void> {
     }
   });
   minerAddress = btc("getnewaddress");
-  if (Number(btc("getblockcount")) < 101) mine(101);
+  // Always at least one fresh block: LND reports "not synced" while the newest block is hours old.
+  mine(Math.max(1, 101 - Number(btc("getblockcount"))));
 
   console.log("Waiting for LND nodes…");
   for (const node of nodes) await waitSynced(node);
@@ -138,6 +185,9 @@ async function main(): Promise<void> {
   }
   mine(6);
 
+  // After a Docker restart containers get new IPs, so LND can't reach the addresses it saved.
+  for (const m of MEMBERS) connectPeer(m, COORDINATOR, coordinatorPubkey);
+
   console.log("Waiting for channels to become active…");
   for (const node of nodes) {
     await retry(`${node} channels`, () => {
@@ -153,8 +203,23 @@ async function main(): Promise<void> {
     });
   }
 
-  // TODO(circle milestone): create the demo circle (3 members, cycle ready to open) via the API.
-  console.log("Seed complete: nodes funded, channels active.");
+  console.log("Baking least-privilege coordinator macaroons…");
+  bakeMacaroon(COORDINATOR, "invoice", INVOICE_URIS);
+  bakeMacaroon(COORDINATOR, "payout", PAYOUT_URIS);
+  for (const m of MEMBERS) bakeMacaroon(m, "wallet", MEMBER_WALLET_URIS);
+
+  console.log("Creating the demo circle…");
+  try {
+    await createDemo();
+    console.log("\nSeed complete: nodes funded, channels active, demo circle ready.");
+  } catch (err) {
+    // The nodes are fine; only the demo circle couldn't be created (wallets in use).
+    console.warn(`\nNodes funded and channels active, but no demo circle: ${err instanceof Error ? err.message : err}`);
+  }
+
+  // Regtest writes its chain index rarely, so an unclean Docker or PC shutdown can lose it.
+  // This RPC forces a flush. Only the seed mines blocks, so the chain is safe from here on.
+  btc("gettxoutsetinfo");
 }
 
 main().catch((err: unknown) => {
