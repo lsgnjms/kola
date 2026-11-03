@@ -1,5 +1,6 @@
 import { randomInt, randomUUID } from "node:crypto";
 import {
+  AssistantRequest,
   auditCircle,
   CreateCircleRequest,
   eventKey,
@@ -13,6 +14,9 @@ import {
 } from "@kola/shared";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { z } from "zod";
+import type { AssistantModel } from "../assistant/claude.js";
+import { buildFacts } from "../assistant/facts.js";
+import { DailyQuota } from "../assistant/quota.js";
 import { memberPubkey, nostrAuth } from "../auth/nostrAuth.js";
 import { contribute } from "../circles/contribute.js";
 import { EngineError, type CycleEngine } from "../circles/engine.js";
@@ -27,11 +31,14 @@ export interface CircleRouteDeps extends Pick<WalletRouteDeps, "bindings" | "wal
   store: CircleStore;
   engine: CycleEngine;
   publisher: NostrPublisher;
+  /** Null without an API key: the app then answers from templates on the device. */
+  assistant: AssistantModel | null;
   coordinator: () => Promise<WalletProvider>;
   nowMs: () => number;
 }
 
 const CircleIdParams = z.object({ id: z.string().uuid() });
+const ASSISTANT_DAILY_LIMIT = 30;
 
 const ENGINE_ERROR_STATUS: Record<EngineError["code"], number> = {
   circle_not_found: 404,
@@ -148,6 +155,45 @@ export async function circleRoutes(app: FastifyInstance, deps: CircleRouteDeps):
     if (circle.status !== "forming") await announceDefinition(circle);
     return view(circle, me);
   });
+
+  // Per member per UTC day, on top of the per-minute rate limit: keeps an API bill bounded.
+  const asked = new DailyQuota(ASSISTANT_DAILY_LIMIT);
+
+  /** Read-only Q&A about the circle. The model sees an allow-listed summary, never keys or payment data. */
+  app.post(
+    "/circles/:id/assistant",
+    { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } },
+    async (request, reply) => {
+      const me = memberPubkey(request);
+      const circle = myCircle(request.params, me, reply);
+      if (!circle) return;
+      if (!deps.assistant) return reply.code(503).send({ error: "assistant_unavailable" });
+      const body = AssistantRequest.safeParse(request.body);
+      if (!body.success) return reply.code(400).send({ error: "invalid_request" });
+
+      if (!asked.take(me, deps.nowMs())) return reply.code(429).send({ error: "rate_limited" });
+
+      const latest = store.latestCycle(circle.id);
+      const facts = buildFacts({
+        circle,
+        members: store.members(circle.id),
+        askedBy: me,
+        latest,
+        contributions: latest ? store.contributions(latest) : [],
+        roundsCompleted: store.paidOutCount(circle.id),
+        nowMs: deps.nowMs(),
+      });
+      try {
+        const answer = await deps.assistant.ask({ facts, question: body.data.question, locale: body.data.locale });
+        if (!answer) return reply.code(503).send({ error: "assistant_unavailable" });
+        return { answer };
+      } catch (err) {
+        // Status only: the error could echo request details, and the question may be personal.
+        request.log.warn({ status: (err as { status?: number }).status }, "assistant request failed");
+        return reply.code(503).send({ error: "assistant_unavailable" });
+      }
+    },
+  );
 
   /** Opens the next round. Only the creator can, so a member can't spam rounds. */
   app.post("/circles/:id/cycles", async (request, reply) => {

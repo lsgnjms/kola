@@ -374,3 +374,18 @@ input.code {
   color: var(--muted);
   font-size: 0.875rem;
 }
+
+.quick {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.answer {
+  white-space: pre-wrap;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 0.875rem;
+}

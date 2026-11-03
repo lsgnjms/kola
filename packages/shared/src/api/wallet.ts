@@ -30,6 +30,7 @@ export const ApiErrorCode = z.enum([
   "cycle_in_progress",
   "circle_complete",
   "no_open_cycle",
+  "assistant_unavailable",
 ]);
 export type ApiErrorCode = z.infer<typeof ApiErrorCode>;
 

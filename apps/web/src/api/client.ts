@@ -1,11 +1,14 @@
 import {
   ApiErrorBody,
+  AssistantResponse,
   BalanceResponse,
   buildCircleEvent,
   CircleListResponse,
   CircleView,
   ClaimResponse,
   ContributeResponse,
+  HealthResponse,
+  type AssistantLocale,
   type CreateCircleRequest,
   type JoinCircleRequest,
   CreateInvoiceResponse,
@@ -114,6 +117,21 @@ export class ApiClient {
       ),
     );
     return this.call("POST", `/circles/${encodeURIComponent(view.id)}/join-record`, CircleView, { event });
+  }
+
+  /** Whether free-text questions are available (the server has an AI key). Unsigned: reveals nothing. */
+  async assistantMode(): Promise<"ai" | "templated"> {
+    try {
+      const res = await this.fetchFn(`${this.base}/health`);
+      const parsed = HealthResponse.safeParse(await res.json());
+      return parsed.success ? parsed.data.assistant : "templated";
+    } catch {
+      return "templated";
+    }
+  }
+
+  askAssistant(id: string, question: string, locale: AssistantLocale) {
+    return this.call("POST", `/circles/${encodeURIComponent(id)}/assistant`, AssistantResponse, { question, locale });
   }
 
   contribute(id: string) {

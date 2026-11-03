@@ -66,6 +66,23 @@ IndexedDB data off an unlocked/rooted phone and brute-forces offline (scrypt mak
 that cost hours, not years). In the demo the key only authorizes a custodial regtest
 wallet; with NWC/mainnet we would add a longer passphrase option and key backup.
 
+## AI assistant
+
+- **Optional.** Without `ANTHROPIC_API_KEY` nothing is sent anywhere; quick
+  questions are answered on the phone from templates.
+- **No tools, no actions.** The model gets a single request and returns text. It
+  cannot call anything, so prompt injection (a nickname or question saying "ignore
+  your rules") can at worst produce a wrong or odd answer, never move money or
+  change a circle. Answers are rendered as plain text, so they can't inject markup.
+- **Allow-listed data only** (`buildFacts`): circle name, nicknames, amounts, round
+  state, who has paid, deadline. Never pubkeys, payment hashes, invoices,
+  preimages, join codes, macaroons or keys (unit-tested). Data and question are
+  wrapped as untrusted, with `<` escaped so they can't close their tags.
+- **Third party:** with a key, that summary and the member's question go to
+  Anthropic's API. Nicknames and the circle name are user-chosen and could be
+  identifying; the UI asks for nicknames, not names. Questions are never logged.
+- **Cost abuse:** per-minute and per-day caps per member bound what one account can spend.
+
 ## Network exposure
 
 - The API binds `127.0.0.1` only; browsers reach it through the web server's
@@ -107,6 +124,7 @@ server's `/relay` path.
 | `POST /circles/join` | NIP-98 | global | 6-char code (32-symbol alphabet); idempotent; full circles refuse |
 | `GET /circles`, `GET /circles/:id` | NIP-98 | global | Members only; others get 404 so ids don't reveal circles |
 | `POST /circles/:id/join-record` | NIP-98, member | global; signature, signer = caller, and rules all checked | Publishes the member's own signed agreement |
+| `POST /circles/:id/assistant` | NIP-98, member | 10/min, 30/day per member; question ≤ 500 chars | 503 without an API key (app uses on-device quick answers) |
 | `POST /circles/:id/cycles` | NIP-98, creator only | global | Opens the next round via the engine |
 | `POST /circles/:id/contribute` | NIP-98, member | 10/min; same caps and checks as pay, amount must equal the contribution | Shares the per-member payment lock with `/wallet/pay` |
 

@@ -8,6 +8,7 @@ import { ErrorMessage, Screen } from "../../ui.js";
 import { canPay, canStartRound, formatCountdown, isLive, memberAt, myContribution, nextRoundNumber } from "./model.js";
 
 const AuditLog = lazy(() => import("./AuditLog.js"));
+const Assistant = lazy(() => import("./Assistant.js"));
 
 /** Refresh while a round is moving; a GET every few seconds is cheap on 3G. */
 const LIVE_REFRESH_MS = 3000;
@@ -22,6 +23,7 @@ export function CircleDetail({ api, id, onBack }: { api: ApiClient; id: string; 
   const [now, setNow] = useState(Date.now());
 
   const [showRecord, setShowRecord] = useState(false);
+  const [showAssistant, setShowAssistant] = useState(false);
   const joinRecordTried = useRef(false);
 
   const load = useCallback(async () => {
@@ -176,6 +178,14 @@ export function CircleDetail({ api, id, onBack }: { api: ApiClient; id: string; 
       {view.status === "completed" && <p className="notice">{t("circle.complete")}</p>}
       {error !== null && <ErrorMessage error={error} />}
 
+      <button type="button" className="secondary" onClick={() => setShowAssistant((s) => !s)}>
+        {t("assistant.open")}
+      </button>
+      {showAssistant && (
+        <Suspense fallback={<p aria-busy="true">{t("common.loading")}</p>}>
+          <Assistant api={api} view={view} />
+        </Suspense>
+      )}
       <button type="button" className="secondary" onClick={() => setShowRecord((s) => !s)}>
         {t("audit.open")}
       </button>

@@ -6,6 +6,7 @@ import type { Env } from "./env.js";
 import { walletRoutes } from "./routes/wallet.js";
 import { WalletBindings } from "./wallet/bindings.js";
 import { MemberWallets, type WalletLoader } from "./wallet/memberWallets.js";
+import { createClaudeAssistant, type AssistantModel } from "./assistant/claude.js";
 import { CycleEngine } from "./circles/engine.js";
 import { NostrPublisher, type RelaySend } from "./circles/publisher.js";
 import { relaySender } from "./circles/relaySender.js";
@@ -38,6 +39,7 @@ export interface ServerDeps {
   walletLoader?: WalletLoader;
   coordinatorLoader?: () => Promise<WalletProvider>;
   relaySend?: RelaySend;
+  assistant?: AssistantModel | null;
   nowMs?: () => number;
   /** Run the cycle engine ticker (default true). Tests drive the engine directly. */
   startEngine?: boolean;
@@ -137,7 +139,9 @@ export async function buildServer(env: Env, deps: ServerDeps = {}): Promise<Fast
   }));
 
   await app.register(walletRoutes, { env, bindings, wallets, payLock, nowMs });
-  await app.register(circleRoutes, { env, bindings, wallets, payLock, store, engine, coordinator, publisher, nowMs });
+  await app.register(circleRoutes, { env, bindings, wallets, payLock, store, engine, coordinator, publisher, nowMs,
+    assistant: deps.assistant !== undefined ? deps.assistant : env.ANTHROPIC_API_KEY ? createClaudeAssistant(env.ANTHROPIC_API_KEY) : null,
+  });
 
   return app;
 }

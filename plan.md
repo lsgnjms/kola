@@ -38,7 +38,7 @@ One circle = ~10 members × 52 weekly contributions = 520 payments/year. A singl
 - [x] Circle: create (name, amount in sats, period, member count), invite via link/code, join, fixed rotation order
 - [x] Cycle engine: open cycle → issue hold invoices → track HTLCs → settle all + pay recipient, or cancel all on deadline
 - [x] Nostr: publish circle, join, contribution, payout and cancellation events; in-app audit log that verifies signatures
-- [ ] AI: Q&A over circle state + generated reminder messages
+- [x] AI: Q&A over circle state + generated reminder messages
 - [ ] One-command setup, seed data, a demo circle that completes a full rotation in minutes
 - [ ] README, architecture diagram, threat model, 3-minute demo video
 
