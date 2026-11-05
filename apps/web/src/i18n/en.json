@@ -225,5 +225,8 @@
   "create.namePlaceholder": "e.g. Market traders",
   "create.potLabel": "Each round, one person receives",
   "create.potExplain": "{people} people take turns, one round each.",
-  "join.explain": "Ask the organizer for the 6-character circle code."
+  "join.explain": "Ask the organizer for the 6-character circle code.",
+  "settings.demoTitle": "Switch demo person",
+  "settings.demoHelp": "Play each member’s part from this one phone or browser. Switching takes a few seconds.",
+  "settings.demoActive": "You now"
 }

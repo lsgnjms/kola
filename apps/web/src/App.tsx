@@ -28,6 +28,16 @@ const CirclesSection = lazy(() => import("./screens/circles/CirclesSection.js"))
 
 /** Lock again after this long in the background. */
 const AUTO_LOCK_MS = 5 * 60 * 1000;
+const ACTIVE_DEMO_KEY = "kola.activeDemo";
+
+function readActiveDemo(): string | null {
+  try {
+    return localStorage.getItem(ACTIVE_DEMO_KEY);
+  } catch {
+    return null;
+  }
+}
+
 /** The published PIN of the regtest demo people. */
 const DEMO_PIN = "123456";
 
@@ -57,7 +67,21 @@ export function App() {
   const [locale, setLocaleState] = useState<Locale>("en");
   const [session, setSession] = useState<Session>({ state: "loading" });
   const [view, setView] = useState<View>("home");
+  // Bumped when the current tab is tapped again, which takes that tab back to its first screen.
+  const [tabReset, setTabReset] = useState(0);
   const [demoPeople, setDemoPeople] = useState<DemoPerson[]>([]);
+  const [activeDemo, setActiveDemo] = useState<string | null>(readActiveDemo);
+
+  /** Which demo person this browser is playing, so Settings can mark them. Cleared for real keys. */
+  const markDemo = (nickname: string | null) => {
+    setActiveDemo(nickname);
+    try {
+      if (nickname) localStorage.setItem(ACTIVE_DEMO_KEY, nickname);
+      else localStorage.removeItem(ACTIVE_DEMO_KEY);
+    } catch {
+      // Not remembered; only affects the marker in Settings.
+    }
+  };
 
   const setLocale = useCallback((next: Locale) => {
     rememberLocale(next);
@@ -115,7 +139,11 @@ export function App() {
   }, [api]);
 
   const openDemoPerson = async (person: DemoPerson) => {
-    if (await keystore.restore(person.backup, DEMO_PIN)) await setUpWallet();
+    keystore.lock();
+    if (await keystore.restore(person.backup, DEMO_PIN)) {
+      markDemo(person.nickname);
+      await setUpWallet();
+    }
   };
 
   let content;
@@ -128,6 +156,7 @@ export function App() {
         <Onboarding
           onCreate={async (pin) => {
             await keystore.create(pin);
+            markDemo(null);
             await setUpWallet();
           }}
           onRestore={() => setSession({ state: "restoring" })}
@@ -144,6 +173,7 @@ export function App() {
           }
           onRestore={async (backup, pin) => {
             const ok = await keystore.restore(backup, pin);
+            if (ok) markDemo(null);
             if (ok) await setUpWallet();
             return ok;
           }}
@@ -194,7 +224,7 @@ export function App() {
       content =
         view === "circles" ? (
           <Suspense fallback={<p aria-busy="true">{t("common.loading")}</p>}>
-            <CirclesSection api={api} />
+            <CirclesSection key={tabReset} api={api} />
           </Suspense>
         ) : view === "receive" ? (
           <Suspense fallback={<p aria-busy="true">{t("common.loading")}</p>}>
@@ -203,7 +233,13 @@ export function App() {
         ) : view === "pay" ? (
           <Pay api={api} onDone={() => setView("home")} />
         ) : view === "settings" ? (
-          <Settings onBackup={() => setView("backup")} onLock={lock} />
+          <Settings
+            onBackup={() => setView("backup")}
+            onLock={lock}
+            demoPeople={demoPeople}
+            activeDemo={activeDemo}
+            onDemoPerson={openDemoPerson}
+          />
         ) : view === "backup" ? (
           <Backup keystore={keystore} onDone={() => setView("settings")} />
         ) : (
@@ -255,7 +291,10 @@ export function App() {
                 type="button"
                 className="tab"
                 aria-current={TAB_OF[view] === tab ? "page" : undefined}
-                onClick={() => setView(target)}
+                onClick={() => {
+                  if (TAB_OF[view] === tab) setTabReset((n) => n + 1);
+                  setView(target);
+                }}
               >
                 {icon}
                 {label}

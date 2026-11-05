@@ -61,7 +61,7 @@ const Env = z.object({
     .default("false")
     .transform((v) => v === "true"),
   /** How long members have to pay their share once a round opens (demo: minutes; production ≤ 24h). */
-  CONTRIBUTION_WINDOW_SECONDS: z.coerce.number().int().min(30).max(24 * 3600).default(300),
+  CONTRIBUTION_WINDOW_SECONDS: z.coerce.number().int().min(30).max(24 * 3600).default(120),
   /**
    * 32-byte hex key that hold-invoice preimages are derived from. If unset, one is
    * generated next to the database on first start. Never log or commit it.

@@ -19,7 +19,9 @@
     "stack:stop": "docker compose -f infra/docker-compose.yml stop",
     "test:integration": "pnpm --filter @kola/api test:integration",
     "demo": "tsx --env-file-if-exists=.env scripts/demo.ts",
-    "demo:reset": "tsx --env-file-if-exists=.env scripts/demo.ts reset"
+    "demo:reset": "tsx --env-file-if-exists=.env scripts/demo.ts reset",
+    "start": "pnpm install --prefer-offline && tsx scripts/start.ts",
+    "start:lan": "pnpm install --prefer-offline && tsx scripts/start.ts --lan"
   },
   "devDependencies": {
     "@eslint/js": "^9.15.0",

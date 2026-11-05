@@ -225,5 +225,8 @@
   "create.namePlaceholder": "ex. Commerçantes du marché",
   "create.potLabel": "À chaque tour, une personne reçoit",
   "create.potExplain": "{people} personnes reçoivent chacune à leur tour.",
-  "join.explain": "Demandez à l’organisateur le code du cercle à 6 caractères."
+  "join.explain": "Demandez à l’organisateur le code du cercle à 6 caractères.",
+  "settings.demoTitle": "Changer de personne de démo",
+  "settings.demoHelp": "Jouez le rôle de chaque membre depuis ce seul téléphone ou navigateur. Le changement prend quelques secondes.",
+  "settings.demoActive": "Vous"
 }

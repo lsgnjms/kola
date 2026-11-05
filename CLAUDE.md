@@ -26,6 +26,10 @@ Keep this section updated if the layout changes.
 Prereqs: Node 22+, `corepack enable` (pnpm version is pinned in `package.json`), Docker.
 
 ```bash
+pnpm start                                          # one command: checks Docker, creates .env, starts the stack, seeds, runs the app
+pnpm start:lan                                      # same, plus phones on the Wi-Fi (allows the LAN address automatically)
+
+# The individual steps it runs:
 pnpm install
 cp .env.example .env
 docker compose -f infra/docker-compose.yml up -d   # regtest stack (bitcoind, coordinator + 6 member LND, relay)
@@ -114,5 +118,6 @@ If a requested change would weaken any of these, stop and flag it instead of imp
 - **After a PC or Docker restart, run `pnpm seed`**: containers get new IPs, so LND needs reconnecting (safe to re-run). `pnpm seed` flushes the chain index when it finishes, but a hard kill with unflushed blocks can leave bitcoind at height 0 while the block files are intact: rebuild with `bitcoind -reindex` instead of wiping anything.
 - Held HTLCs lock liquidity and are bounded by CLTV expiry; keep contribution windows short (minutes in demo, ≤ 24h in production).
 - The coordinator is a trust assumption (it holds funds briefly between settle and payout, and could refuse service). Document it; don't hide it.
+- **Demo flow for judges:** one browser is enough. Tap Aminata on the welcome screen, start round 1, pay, then switch to Fatou and Moussa in Settings (demo switcher, DEMO_MODE only) to pay their shares. Contribution window defaults to 2 minutes so the refund path is quick to show.
 - **Wallet pool:** alice/bob/carol host the demo people (Aminata, Fatou, Moussa); dave/erin/frank are spare wallets for brand-new accounts, so judges can run a whole circle from scratch. With `DEMO_MODE=true` (regtest only) the welcome screen offers the demo people in one tap.
 - **Demo wallets are custodial.** Member LND nodes sit behind the API, which holds their macaroons. Fine for regtest; say so in the threat model and pitch, and present NWC (members bring their own wallet) as the path out.
