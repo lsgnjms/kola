@@ -40,7 +40,7 @@ One circle = ~10 members × 52 weekly contributions = 520 payments/year. A singl
 - [x] Nostr: publish circle, join, contribution, payout and cancellation events; in-app audit log that verifies signatures
 - [x] AI: Q&A over circle state + generated reminder messages
 - [ ] One-command setup, seed data, a demo circle that completes a full rotation in minutes (`pnpm start` + demo circle + one-tap demo people + one-browser switcher done; fresh-clone test pending)
-- [ ] README, architecture diagram, threat model, 3-minute demo video
+- [ ] README, architecture diagram, threat model, 3-minute demo video (README + diagrams + threat model done; video pending)
 
 ### Stretch (only if MVP is done)
 - [ ] Voice input/output in Wolof, Yoruba or Pidgin

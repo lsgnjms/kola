@@ -88,9 +88,10 @@ export function CircleDetail({ api, id, onBack }: { api: ApiClient; id: string; 
 
   const potSat = view.contributionSat * view.memberCount;
   const nextPosition = (nextRoundNumber(view) - 1) % view.memberCount;
-  const heroMember = recipient ?? memberAt(view, nextPosition);
   const paidCount = cycle?.contributions.filter((c) => c.status === "held" || c.status === "paid").length ?? 0;
   const roundLive = cycle !== null && isLive(view);
+  // During a round: its recipient. Between rounds: whoever is next in the rotation, not last round's.
+  const heroMember = roundLive ? recipient : memberAt(view, nextPosition);
   const pill = { unpaid: "pill-wait", held: "pill-ok", paid: "pill-ok", refunded: "" } as const;
 
   return (
