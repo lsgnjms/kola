@@ -43,43 +43,74 @@ export function CreateCircle({
   return (
     <Screen title={t("create.title")} onBack={onBack}>
       <form onSubmit={submit}>
-        <div className="field">
-          <label htmlFor={ids.name}>{t("create.name")}</label>
-          <input id={ids.name} value={name} maxLength={60} onChange={(e) => setName(e.target.value)} autoFocus />
+        <div className="card">
+          <div className="field">
+            <label htmlFor={ids.name}>{t("create.name")}</label>
+            <input
+              id={ids.name}
+              value={name}
+              maxLength={60}
+              placeholder={t("create.namePlaceholder")}
+              onChange={(e) => setName(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div className="field">
+            <label htmlFor={ids.amount}>{t("create.amount")}</label>
+            <div className="input-affix">
+              <input
+                id={ids.amount}
+                inputMode="numeric"
+                placeholder="10,000"
+                value={amount ? formatSat(locale, Number(amount)) : ""}
+                onChange={(e) => setAmount(e.target.value.replace(/\D/g, "").slice(0, 9))}
+              />
+              <span>sats</span>
+            </div>
+          </div>
+          <fieldset className="field" style={{ border: "none", padding: 0, margin: 0 }}>
+            <legend id={ids.size} style={{ fontWeight: 600, fontSize: "0.9375rem", marginBottom: "0.375rem" }}>
+              {t("create.members")}
+            </legend>
+            <div className="segmented" role="group" aria-labelledby={ids.size}>
+              {SIZES.map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  className="preset"
+                  aria-pressed={memberCount === n}
+                  onClick={() => setMemberCount(n)}
+                >
+                  {n}
+                </button>
+              ))}
+            </div>
+          </fieldset>
         </div>
-        <div className="field">
-          <label htmlFor={ids.amount}>{t("create.amount")}</label>
-          <input
-            id={ids.amount}
-            inputMode="numeric"
-            pattern="[0-9]*"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))}
-          />
+
+        <div className="card">
+          <div className="field">
+            <label htmlFor={ids.nickname}>{t("create.nickname")}</label>
+            <input
+              id={ids.nickname}
+              value={nickname}
+              maxLength={24}
+              aria-describedby={ids.help}
+              onChange={(e) => setNickname(e.target.value)}
+            />
+            <small id={ids.help}>{t("create.nicknameHelp")}</small>
+          </div>
         </div>
-        <div className="field">
-          <label htmlFor={ids.size}>{t("create.members")}</label>
-          <select id={ids.size} value={memberCount} onChange={(e) => setMemberCount(Number(e.target.value))}>
-            {SIZES.map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field">
-          <label htmlFor={ids.nickname}>{t("create.nickname")}</label>
-          <input
-            id={ids.nickname}
-            value={nickname}
-            maxLength={24}
-            aria-describedby={ids.help}
-            onChange={(e) => setNickname(e.target.value)}
-          />
-          <small id={ids.help}>{t("create.nicknameHelp")}</small>
-        </div>
+
         {contributionSat > 0 && (
-          <p className="notice">{t("create.potPreview", { amount: formatSat(locale, contributionSat * memberCount) })}</p>
+          <div className="hero">
+            <span className="hero-label">{t("create.potLabel")}</span>
+            <span className="hero-amount">
+              {formatSat(locale, contributionSat * memberCount)}
+              <span className="hero-unit">sats</span>
+            </span>
+            <span className="hero-label">{t("create.potExplain", { people: memberCount })}</span>
+          </div>
         )}
         {error !== null && <ErrorMessage error={error} />}
         <button type="submit" className="primary" disabled={!valid || busy}>

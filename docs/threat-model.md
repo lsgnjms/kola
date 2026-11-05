@@ -114,6 +114,7 @@ server's `/relay` path.
 | Route | Auth | Limits | Notes |
 |---|---|---|---|
 | `GET /health` | none | global 100/min | Reveals only whether AI is enabled |
+| `GET /demo/people` | none | global | Exists only with `DEMO_MODE=true` **and** regtest; returns the demo people's backup codes (published PIN). Regtest throwaway keys, test money only |
 | `POST /wallet/claim` | NIP-98 | global | Binds a free demo node; 409 when none left |
 | `GET /wallet/balance` | NIP-98 | global | |
 | `POST /wallet/invoices` | NIP-98 | global; amount ≤ `MAX_PAYMENT_SAT` | Fixed memo (no user text in invoices) |

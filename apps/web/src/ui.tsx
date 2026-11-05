@@ -2,17 +2,31 @@ import { useId, type ReactNode } from "react";
 import { ApiError } from "./api/client.js";
 import { describeError } from "./format.js";
 import { useI18n } from "./i18n/index.js";
+import { ChevronLeft } from "./icons.js";
 
-export function Screen({ title, children, onBack }: { title: string; children: ReactNode; onBack?: () => void }) {
+export function Screen({
+  title,
+  children,
+  onBack,
+  action,
+}: {
+  title: string;
+  children: ReactNode;
+  onBack?: () => void;
+  action?: ReactNode;
+}) {
   const { t } = useI18n();
   return (
     <section className="screen-body">
-      {onBack && (
-        <button type="button" className="link" onClick={onBack}>
-          ← {t("common.back")}
-        </button>
-      )}
-      <h2>{title}</h2>
+      <div className="screen-head">
+        {onBack && (
+          <button type="button" className="icon-btn" onClick={onBack} aria-label={t("common.back")}>
+            <ChevronLeft />
+          </button>
+        )}
+        <h2 style={{ flex: 1 }}>{title}</h2>
+        {action}
+      </div>
       {children}
     </section>
   );
@@ -60,5 +74,39 @@ export function PinField({
         onChange={(e) => onChange(e.target.value.replace(/\D/g, "").slice(0, 6))}
       />
     </div>
+  );
+}
+
+/** Round icon button with a label underneath, as in mobile wallets. */
+export function ActionButton({
+  icon,
+  label,
+  onClick,
+  disabled = false,
+}: {
+  icon: ReactNode;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button type="button" className="action" onClick={onClick} disabled={disabled}>
+      <span className="action-icon">{icon}</span>
+      {label}
+    </button>
+  );
+}
+
+const AVATAR_COLOURS = ["#1f7a4d", "#b5532a", "#2b6cb0", "#8a4fbf", "#b7791f", "#2c7a7b", "#c53060", "#4a5568"];
+
+/** Initial on a colour picked from the name, so each member is recognisable at a glance. */
+export function Avatar({ name, small = false }: { name: string; small?: boolean }) {
+  let hash = 0;
+  for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  const colour = AVATAR_COLOURS[hash % AVATAR_COLOURS.length];
+  return (
+    <span className={small ? "avatar avatar-sm" : "avatar"} style={{ background: colour }} aria-hidden="true">
+      {name.trim().charAt(0).toUpperCase() || "?"}
+    </span>
   );
 }

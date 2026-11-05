@@ -4,7 +4,8 @@ import type { ApiClient } from "../../api/client.js";
 import { copyText } from "../../clipboard.js";
 import { formatSat } from "../../format.js";
 import { useI18n } from "../../i18n/index.js";
-import { ErrorMessage, Screen } from "../../ui.js";
+import { Check, Clock, Copy, Receipt, Share, Sparkles } from "../../icons.js";
+import { ActionButton, Avatar, ErrorMessage, Screen } from "../../ui.js";
 import { canPay, canStartRound, formatCountdown, isLive, memberAt, myContribution, nextRoundNumber } from "./model.js";
 
 const AuditLog = lazy(() => import("./AuditLog.js"));
@@ -85,51 +86,99 @@ export function CircleDetail({ api, id, onBack }: { api: ApiClient; id: string; 
     refunded: t("contrib.refunded"),
   };
 
+  const potSat = view.contributionSat * view.memberCount;
+  const nextPosition = (nextRoundNumber(view) - 1) % view.memberCount;
+  const heroMember = recipient ?? memberAt(view, nextPosition);
+  const paidCount = cycle?.contributions.filter((c) => c.status === "held" || c.status === "paid").length ?? 0;
+  const roundLive = cycle !== null && isLive(view);
+  const pill = { unpaid: "pill-wait", held: "pill-ok", paid: "pill-ok", refunded: "" } as const;
+
   return (
     <Screen title={view.name} onBack={onBack}>
-      <p>
-        {t("circles.summary", {
-          amount: sats(view.contributionSat),
-          joined: view.members.length,
-          total: view.memberCount,
-        })}
-      </p>
+      <div className="hero" aria-live="polite">
+        <span className="hero-label">{t("circle.potLabel")}</span>
+        <span className="hero-amount">
+          {sats(cycle?.potSat ?? potSat)}
+          <span className="hero-unit">sats</span>
+        </span>
+        <span className="hero-label">
+          {t("circles.summary", { amount: sats(view.contributionSat), joined: view.members.length, total: view.memberCount })}
+        </span>
+        {view.status !== "forming" && view.status !== "completed" && heroMember && (
+          <div className="hero-row">
+            <span className="recipient">
+              <Avatar name={heroMember.nickname} />
+              <span>
+                <strong>{heroMember.nickname}</strong>
+                <br />
+                <small>
+                  {roundLive
+                    ? t("circle.round", { n: (cycle?.cycleIndex ?? 0) + 1, total: view.memberCount })
+                    : t("circle.nextUp", { n: nextRoundNumber(view) })}
+                </small>
+              </span>
+            </span>
+            {cycle?.state === "collecting" && (
+              <span className="chip countdown">
+                <Clock size={14} />
+                {formatCountdown(cycle.deadlineMs - now)}
+              </span>
+            )}
+          </div>
+        )}
+        {roundLive && cycle && (
+          <div className="progress" style={{ marginTop: "0.75rem" }} aria-hidden="true">
+            <span style={{ width: `${(paidCount / view.memberCount) * 100}%` }} />
+          </div>
+        )}
+      </div>
 
       {view.status === "forming" && (
-        <div className="notice">
-          <p>{t("circle.waiting", { count: view.memberCount - view.members.length })}</p>
-          <p>{t("circle.invite")}</p>
-          <p className="code big">{view.joinCode}</p>
-          {view.isCreator && <p>{t("circle.notReady")}</p>}
+        <div className="card">
+          <h3>{t("circle.inviteTitle")}</h3>
+          <p className="hint">
+            {t("circle.waiting", { count: view.memberCount - view.members.length })} {t("circle.invite")}
+          </p>
+          <p className="code-box">{view.joinCode}</p>
           <button type="button" className="secondary" onClick={() => void copyText(view.joinCode).then(setCopied)}>
+            <Copy size={20} />
             {copied ? t("common.copied") : t("common.copy")}
           </button>
+          {view.isCreator && <p className="hint">{t("circle.notReady")}</p>}
         </div>
       )}
 
       {cycle && recipient && (
-        <section className="round" aria-live="polite">
-          <h3>{t("circle.round", { n: cycle.cycleIndex + 1, total: view.memberCount })}</h3>
-          <p>{t("circle.recipient", { name: recipient.nickname, amount: sats(cycle.potSat) })}</p>
-          <p className="round-state">
+        <div className="card">
+          <div className="section-head" style={{ marginTop: 0 }}>
+            <h3>{t("circle.round", { n: cycle.cycleIndex + 1, total: view.memberCount })}</h3>
+            <span className="muted">{t("circle.paidCount", { paid: paidCount, total: view.memberCount })}</span>
+          </div>
+          <p className="hint">
             {cycle.state === "paid_out"
               ? t("circle.state.paid_out", { name: recipient.nickname, amount: sats(cycle.potSat) })
               : cycle.state === "paying_out"
                 ? t("circle.state.paying_out", { name: recipient.nickname })
                 : t(`circle.state.${cycle.state}`)}
           </p>
-          {cycle.state === "collecting" && (
-            <p className="countdown">{t("circle.timeLeft", { time: formatCountdown(cycle.deadlineMs - now) })}</p>
-          )}
-          <ul className="contributions">
-            {cycle.contributions.map((c) => (
-              <li key={c.position} className={`contrib contrib-${c.status}`}>
-                <span>{memberAt(view, c.position)?.nickname}</span>
-                <span>{contributionLabel[c.status]}</span>
-              </li>
-            ))}
+          <ul className="list">
+            {cycle.contributions.map((c) => {
+              const member = memberAt(view, c.position);
+              return (
+                <li key={c.position} className="row">
+                  <Avatar name={member?.nickname ?? "?"} small />
+                  <span className="row-main">
+                    <span className="row-title">
+                      {member?.nickname}
+                      {member?.isYou && <span className="muted"> ({t("circle.you")})</span>}
+                    </span>
+                  </span>
+                  <span className={`pill ${pill[c.status]}`}>{contributionLabel[c.status]}</span>
+                </li>
+              );
+            })}
           </ul>
-        </section>
+        </div>
       )}
 
       {canPay(view, now) && (
@@ -149,7 +198,7 @@ export function CircleDetail({ api, id, onBack }: { api: ApiClient; id: string; 
         </button>
       )}
       {contributed && cycle?.state === "collecting" && myContribution(view) !== "unpaid" && (
-        <p className="notice" role="status">
+        <p className="notice notice-ok" role="status">
           {t("circle.shareHeld")}
         </p>
       )}
@@ -174,21 +223,40 @@ export function CircleDetail({ api, id, onBack }: { api: ApiClient; id: string; 
           {t("circle.startRound", { n: nextRoundNumber(view) })}
         </button>
       )}
-      {view.status === "active" && !view.isCreator && !isLive(view) && <p>{t("circle.waitOrganizer")}</p>}
-      {view.status === "completed" && <p className="notice">{t("circle.complete")}</p>}
+      {view.status === "active" && !view.isCreator && !isLive(view) && (
+        <p className="notice">{t("circle.waitOrganizer")}</p>
+      )}
+      {view.status === "completed" && <p className="notice notice-ok">{t("circle.complete")}</p>}
       {error !== null && <ErrorMessage error={error} />}
 
-      <button type="button" className="secondary" onClick={() => setShowAssistant((s) => !s)}>
-        {t("assistant.open")}
-      </button>
+      <div className="actions-row">
+        <ActionButton
+          icon={<Sparkles />}
+          label={t("circle.actionAsk")}
+          onClick={() => {
+            setShowAssistant((s) => !s);
+            setShowRecord(false);
+          }}
+        />
+        <ActionButton
+          icon={<Receipt />}
+          label={t("circle.actionRecord")}
+          onClick={() => {
+            setShowRecord((s) => !s);
+            setShowAssistant(false);
+          }}
+        />
+        <ActionButton
+          icon={copied ? <Check /> : <Share />}
+          label={copied ? t("common.copied") : t("circle.actionInvite")}
+          onClick={() => void copyText(view.joinCode).then(setCopied)}
+        />
+      </div>
       {showAssistant && (
         <Suspense fallback={<p aria-busy="true">{t("common.loading")}</p>}>
           <Assistant api={api} view={view} />
         </Suspense>
       )}
-      <button type="button" className="secondary" onClick={() => setShowRecord((s) => !s)}>
-        {t("audit.open")}
-      </button>
       {showRecord && (
         <Suspense fallback={<p aria-busy="true">{t("common.loading")}</p>}>
           <AuditLog view={view} />
@@ -196,18 +264,29 @@ export function CircleDetail({ api, id, onBack }: { api: ApiClient; id: string; 
       )}
 
       <h3>{t("circle.members")}</h3>
-      <ol className="members">
-        {view.members.map((m) => (
-          <li key={m.position} className={cycle?.recipientPosition === m.position && isLive(view) ? "current" : ""}>
-            <span>
-              {m.nickname}
-              {m.isYou && ` (${t("circle.you")})`}
-              {m.isCreator && ` · ${t("circle.organizer")}`}
-            </span>
-            <small>{t("circle.receivesRound", { n: m.position + 1 })}</small>
-          </li>
-        ))}
-      </ol>
+      <div className="card card-flush">
+        <ol className="list timeline">
+          {view.members.map((m) => {
+            const received = m.position < view.completedCycles;
+            const current = roundLive && cycle?.recipientPosition === m.position;
+            return (
+              <li key={m.position} className={current ? "row current" : "row"}>
+                <Avatar name={m.nickname} small />
+                <span className="row-main">
+                  <span className="row-title">
+                    {m.nickname}
+                    {m.isYou && <small> · {t("circle.you")}</small>}
+                    {m.isCreator && <small> · {t("circle.organizer")}</small>}
+                  </span>
+                  <span className="row-sub">{t("circle.receivesRound", { n: m.position + 1 })}</span>
+                </span>
+                {received && <span className="pill pill-ok">{t("circle.received")}</span>}
+                {current && <span className="pill pill-wait">{t("circle.thisRound")}</span>}
+              </li>
+            );
+          })}
+        </ol>
+      </div>
     </Screen>
   );
 }

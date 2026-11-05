@@ -7,6 +7,8 @@ import {
   CircleView,
   ClaimResponse,
   ContributeResponse,
+  DemoPeopleResponse,
+  type DemoPerson,
   HealthResponse,
   type AssistantLocale,
   type CreateCircleRequest,
@@ -127,6 +129,18 @@ export class ApiClient {
       return parsed.success ? parsed.data.assistant : "templated";
     } catch {
       return "templated";
+    }
+  }
+
+  /** One-tap demo people (regtest demo only). Empty when the server has none to offer. Unsigned. */
+  async demoPeople(): Promise<DemoPerson[]> {
+    try {
+      const res = await this.fetchFn(`${this.base}/demo/people`);
+      if (!res.ok) return [];
+      const parsed = DemoPeopleResponse.safeParse(await res.json());
+      return parsed.success ? parsed.data.people : [];
+    } catch {
+      return [];
     }
   }
 

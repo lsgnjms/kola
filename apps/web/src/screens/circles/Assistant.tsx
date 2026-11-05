@@ -52,9 +52,9 @@ export default function Assistant({ api, view }: { api: ApiClient; view: CircleV
   };
 
   return (
-    <section className="round">
+    <section className="card">
       <h3>{t("assistant.title")}</h3>
-      <div className="quick">
+      <div className="quick" style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
         {QUICK.map(({ question: q, label }) => (
           <button
             key={q}

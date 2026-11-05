@@ -19,3 +19,13 @@ export const HealthResponse = z.object({
   status: z.literal("ok"),
   assistant: z.enum(["ai", "templated"]),
 });
+
+/** Regtest demo people offered on the welcome screen (DEMO_MODE only). Backup codes use the published PIN. */
+export const DemoPerson = z.object({
+  nickname: z.string(),
+  role: z.enum(["organizer", "member"]),
+  backup: z.string().startsWith("ncryptsec1"),
+});
+export type DemoPerson = z.infer<typeof DemoPerson>;
+
+export const DemoPeopleResponse = z.object({ people: z.array(DemoPerson) });

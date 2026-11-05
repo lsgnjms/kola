@@ -1,6 +1,7 @@
 import { useId, useState, type FormEvent } from "react";
 import type { ApiClient } from "../../api/client.js";
 import { useI18n } from "../../i18n/index.js";
+import { Key } from "../../icons.js";
 import { ErrorMessage, Screen } from "../../ui.js";
 
 export function JoinCircle({
@@ -37,7 +38,12 @@ export function JoinCircle({
   return (
     <Screen title={t("join.title")} onBack={onBack}>
       <form onSubmit={submit}>
-        <div className="field">
+        <div className="card">
+          <span className="empty-icon" style={{ alignSelf: "center" }}>
+            <Key />
+          </span>
+          <p className="hint center">{t("join.explain")}</p>
+          <div className="field">
           <label htmlFor={ids.code}>{t("join.code")}</label>
           <input
             id={ids.code}
@@ -49,9 +55,12 @@ export function JoinCircle({
             value={code}
             // Same alphabet as the server: no 0/O/1/I, so codes read aloud unambiguously.
             onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-HJ-NP-Z2-9]/g, ""))}
+            placeholder="ABC234"
             autoFocus
           />
+          </div>
         </div>
+        <div className="card">
         <div className="field">
           <label htmlFor={ids.nickname}>{t("create.nickname")}</label>
           <input
@@ -62,6 +71,7 @@ export function JoinCircle({
             onChange={(e) => setNickname(e.target.value)}
           />
           <small id={ids.help}>{t("create.nicknameHelp")}</small>
+        </div>
         </div>
         {error !== null && <ErrorMessage error={error} />}
         <button type="submit" className="primary" disabled={!valid || busy}>

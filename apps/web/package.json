@@ -16,6 +16,7 @@
     "@noble/hashes": "^2.0.1",
     "idb-keyval": "^6.2.1",
     "nostr-tools": "^2.10.4",
+    "preact": "^10.24.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "uqr": "^0.1.2",

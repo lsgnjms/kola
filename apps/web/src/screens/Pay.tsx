@@ -3,6 +3,7 @@ import { useId, useState, type FormEvent } from "react";
 import type { ApiClient } from "../api/client.js";
 import { formatSat } from "../format.js";
 import { useI18n } from "../i18n/index.js";
+import { ArrowUp, Check, Clipboard, Clock } from "../icons.js";
 import { ErrorMessage, Screen } from "../ui.js";
 
 type Step =
@@ -49,10 +50,15 @@ export function Pay({ api, onDone }: { api: ApiClient; onDone: () => void }) {
     const succeeded = result.status === "succeeded";
     return (
       <Screen title={t(succeeded ? "pay.successTitle" : "pay.inFlightTitle")}>
-        <p className="big">{t("common.sats", { amount: formatSat(locale, result.amountSat) })}</p>
-        <p role="status">
-          {succeeded ? t("pay.successFee", { amount: formatSat(locale, result.feeSat) }) : t("pay.inFlight")}
-        </p>
+        <div className="card center">
+          <span className="result-icon">{succeeded ? <Check size={36} /> : <Clock size={36} />}</span>
+          <p className="big">
+            {formatSat(locale, result.amountSat)} <span className="muted">sats</span>
+          </p>
+          <p role="status" className="hint">
+            {succeeded ? t("pay.successFee", { amount: formatSat(locale, result.feeSat) }) : t("pay.inFlight")}
+          </p>
+        </div>
         <button type="button" className="primary" onClick={onDone}>
           {t("common.done")}
         </button>
@@ -64,7 +70,15 @@ export function Pay({ api, onDone }: { api: ApiClient; onDone: () => void }) {
     const sending = step.name === "sending";
     return (
       <Screen title={t("pay.confirmTitle")} {...(sending ? {} : { onBack: () => setStep({ name: "enter" }) })}>
-        <p className="big">{t("pay.confirmAmount", { amount: formatSat(locale, step.decoded.amountSat) })}</p>
+        <div className="card center">
+          <span className="result-icon">
+            <ArrowUp size={36} />
+          </span>
+          <p className="big">
+            {formatSat(locale, step.decoded.amountSat)} <span className="muted">sats</span>
+          </p>
+          <p className="hint">{t("pay.confirmAmount", { amount: formatSat(locale, step.decoded.amountSat) })}</p>
+        </div>
         <button type="button" className="primary" disabled={sending} onClick={() => void pay(step.decoded)}>
           {sending ? t("pay.sending") : t("pay.confirm")}
         </button>
@@ -72,20 +86,43 @@ export function Pay({ api, onDone }: { api: ApiClient; onDone: () => void }) {
     );
   }
 
+  // The clipboard API needs a secure context; over plain-http LAN testing, members paste by hand.
+  const canPaste = typeof navigator.clipboard?.readText === "function" && window.isSecureContext;
+
   return (
     <Screen title={t("pay.title")} onBack={onDone}>
       <form onSubmit={check}>
-        <div className="field">
-          <label htmlFor={inputId}>{t("pay.pasteLabel")}</label>
+        <div className="card">
+          <div className="section-head" style={{ marginTop: 0 }}>
+            <label htmlFor={inputId}>{t("pay.pasteLabel")}</label>
+            {canPaste && (
+              <button
+                type="button"
+                className="ghost"
+                style={{ minHeight: 40, padding: "0.25rem 0.5rem" }}
+                onClick={() =>
+                  void navigator.clipboard
+                    .readText()
+                    .then((text) => setPaymentRequest(text.trim()))
+                    .catch(() => undefined)
+                }
+              >
+                <Clipboard size={18} />
+                {t("pay.pasteButton")}
+              </button>
+            )}
+          </div>
           <textarea
             id={inputId}
             className="mono"
             rows={4}
             autoComplete="off"
             spellCheck={false}
+            placeholder="lnbcrt…"
             value={paymentRequest}
             onChange={(e) => setPaymentRequest(e.target.value)}
           />
+          <p className="hint">{t("pay.help")}</p>
         </div>
         {error !== null && <ErrorMessage error={error} />}
         <button type="submit" className="primary" disabled={busy || !paymentRequest.trim()}>

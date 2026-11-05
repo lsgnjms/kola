@@ -13,6 +13,7 @@ import { relaySender } from "./circles/relaySender.js";
 import { loadCoordinatorKey, loadPreimageSecret } from "./circles/secret.js";
 import { CircleStore } from "./circles/store.js";
 import { circleRoutes } from "./routes/circles.js";
+import { demoRoutes } from "./routes/demo.js";
 import { lndWalletFromFiles } from "./wallet/lnd/fromFiles.js";
 import { KeyedMutex } from "./wallet/spendCaps.js";
 import type { WalletProvider } from "./wallet/WalletProvider.js";
@@ -138,6 +139,7 @@ export async function buildServer(env: Env, deps: ServerDeps = {}): Promise<Fast
     assistant: env.ANTHROPIC_API_KEY ? "ai" : "templated",
   }));
 
+  await app.register(demoRoutes, { env });
   await app.register(walletRoutes, { env, bindings, wallets, payLock, nowMs });
   await app.register(circleRoutes, { env, bindings, wallets, payLock, store, engine, coordinator, publisher, nowMs,
     assistant: deps.assistant !== undefined ? deps.assistant : env.ANTHROPIC_API_KEY ? createClaudeAssistant(env.ANTHROPIC_API_KEY) : null,

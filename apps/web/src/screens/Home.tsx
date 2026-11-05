@@ -3,30 +3,33 @@ import { useCallback, useEffect, useState } from "react";
 import type { ApiClient } from "../api/client.js";
 import { formatSat, formatTime } from "../format.js";
 import { useI18n } from "../i18n/index.js";
-import { ErrorMessage } from "../ui.js";
+import { ArrowDown, ArrowUp, Bolt, Cross, Refresh, Users } from "../icons.js";
+import { ActionButton, ErrorMessage } from "../ui.js";
 
 interface WalletState {
   balanceSat: number;
   transactions: WalletTransactionView[];
 }
 
+/** Rows shown before "See all": enough to recognise recent payments without a long scroll. */
+const RECENT_ROWS = 5;
+
 export function Home({
   api,
   onReceive,
   onPay,
-  onBackup,
-  onLock,
+  onCircles,
 }: {
   api: ApiClient;
   onReceive: () => void;
   onPay: () => void;
-  onBackup: () => void;
-  onLock: () => void;
+  onCircles: () => void;
 }) {
   const { t, locale } = useI18n();
   const [wallet, setWallet] = useState<WalletState | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [loading, setLoading] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -45,67 +48,85 @@ export function Home({
     void refresh();
   }, [refresh]);
 
+  const transactions = wallet?.transactions ?? [];
+  const visible = showAll ? transactions : transactions.slice(0, RECENT_ROWS);
+
   return (
     <section className="screen-body">
-      <div className="balance" aria-live="polite">
-        <p className="balance-label">{t("home.balance")}</p>
-        <p className="balance-amount">
-          {wallet ? t("common.sats", { amount: formatSat(locale, wallet.balanceSat) }) : t("common.loading")}
-        </p>
+      <div className="hero" aria-live="polite">
+        <span className="hero-label">{t("home.balance")}</span>
+        <span className="hero-amount">
+          {wallet ? formatSat(locale, wallet.balanceSat) : "…"}
+          <span className="hero-unit">sats</span>
+        </span>
+        <span className="chip">
+          <Bolt size={14} />
+          {t("home.testMoney")}
+        </span>
+      </div>
+
+      <div className="actions-row">
+        <ActionButton icon={<ArrowDown />} label={t("home.receive")} onClick={onReceive} />
+        <ActionButton icon={<ArrowUp />} label={t("home.pay")} onClick={onPay} />
+        <ActionButton icon={<Users />} label={t("nav.circles")} onClick={onCircles} />
       </div>
 
       {error !== null && <ErrorMessage error={error} />}
 
-      <div className="actions">
-        <button type="button" className="primary" onClick={onReceive}>
-          {t("home.receive")}
-        </button>
-        <button type="button" className="primary" onClick={onPay}>
-          {t("home.pay")}
+      <div className="section-head">
+        <h3>{t("home.history")}</h3>
+        <button
+          type="button"
+          className="icon-btn"
+          onClick={() => void refresh()}
+          disabled={loading}
+          aria-label={t("home.refresh")}
+        >
+          <Refresh size={20} />
         </button>
       </div>
 
-      <div className="row">
-        <h2>{t("home.history")}</h2>
-        <button type="button" className="secondary" onClick={() => void refresh()} disabled={loading}>
-          {t("home.refresh")}
-        </button>
-      </div>
-      {wallet && wallet.transactions.length === 0 && <p>{t("home.empty")}</p>}
-      <ul className="history">
-        {wallet?.transactions.map((tx, i) => (
-          <li key={`${tx.timestampMs}-${i}`} className={`tx tx-${tx.direction} tx-${tx.status}`}>
-            <span>
-              <strong>{t(tx.direction === "in" ? "history.in" : "history.out")}</strong>
-              {tx.status !== "complete" && (
-                <span className="tx-status">
-                  {" · "}
-                  {t(tx.status === "pending" ? "history.pending" : "history.failed")}
+      <div className="card card-flush">
+        {wallet && transactions.length === 0 ? (
+          <div className="empty">
+            <span className="empty-icon">
+              <Bolt />
+            </span>
+            <p>{t("home.empty")}</p>
+          </div>
+        ) : (
+          <ul className="list">
+            {visible.map((tx, i) => (
+              <li key={`${tx.timestampMs}-${i}`} className={`row tx-${tx.direction} tx-${tx.status}`}>
+                <span className="tx-icon">
+                  {tx.status === "failed" ? <Cross size={20} /> : tx.direction === "in" ? <ArrowDown size={20} /> : <ArrowUp size={20} />}
                 </span>
-              )}
-              <br />
-              <small>{formatTime(locale, tx.timestampMs)}</small>
-            </span>
-            <span className="tx-amount">
-              {tx.direction === "in" ? "+" : "−"}
-              {t("common.sats", { amount: formatSat(locale, tx.amountSat) })}
-              {tx.feeSat > 0 && (
-                <>
-                  <br />
-                  <small>{t("history.fee", { amount: formatSat(locale, tx.feeSat) })}</small>
-                </>
-              )}
-            </span>
-          </li>
-        ))}
-      </ul>
-
-      <button type="button" className="secondary" onClick={onBackup}>
-        {t("home.backup")}
-      </button>
-      <button type="button" className="secondary" onClick={onLock}>
-        {t("home.lock")}
-      </button>
+                <span className="row-main">
+                  <span className="row-title">
+                    {t(tx.direction === "in" ? "history.in" : "history.out")}
+                    {tx.status !== "complete" && (
+                      <span className={`pill ${tx.status === "pending" ? "pill-wait" : "pill-bad"}`} style={{ marginLeft: 8 }}>
+                        {t(tx.status === "pending" ? "history.pending" : "history.failed")}
+                      </span>
+                    )}
+                  </span>
+                  <span className="row-sub">{formatTime(locale, tx.timestampMs)}</span>
+                </span>
+                <span className="row-end">
+                  {tx.direction === "in" ? "+" : "−"}
+                  {formatSat(locale, tx.amountSat)}
+                  {tx.feeSat > 0 && <small>{t("history.fee", { amount: formatSat(locale, tx.feeSat) })}</small>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      {transactions.length > RECENT_ROWS && (
+        <button type="button" className="secondary" onClick={() => setShowAll((s) => !s)}>
+          {showAll ? t("home.showLess") : t("home.seeAll", { count: transactions.length })}
+        </button>
+      )}
     </section>
   );
 }

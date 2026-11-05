@@ -1,4 +1,5 @@
-# Regtest stack: bitcoind + coordinator LND + 3 member LND nodes + Nostr relay.
+# Regtest stack: bitcoind + coordinator LND + 6 member LND nodes + Nostr relay.
+# alice/bob/carol host the demo people; dave/erin/frank are spare wallets for new accounts.
 # Regtest only; never point this at mainnet.
 # Host ports are bound to 127.0.0.1 so nothing is exposed on the network.
 name: kola
@@ -70,6 +71,24 @@ services:
     command: [--alias=carol, --tlsextradomain=carol]
     ports: ["127.0.0.1:8084:8080"]
     volumes: ["./data/carol:/root/.lnd"]
+
+  dave:
+    <<: *lnd
+    command: [--alias=dave, --tlsextradomain=dave]
+    ports: ["127.0.0.1:8085:8080"]
+    volumes: ["./data/dave:/root/.lnd"]
+
+  erin:
+    <<: *lnd
+    command: [--alias=erin, --tlsextradomain=erin]
+    ports: ["127.0.0.1:8086:8080"]
+    volumes: ["./data/erin:/root/.lnd"]
+
+  frank:
+    <<: *lnd
+    command: [--alias=frank, --tlsextradomain=frank]
+    ports: ["127.0.0.1:8087:8080"]
+    volumes: ["./data/frank:/root/.lnd"]
 
   relay:
     image: scsibug/nostr-rs-relay:0.9.0

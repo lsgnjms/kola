@@ -50,8 +50,16 @@ const Env = z.object({
   BITCOIN_NETWORK: z.enum(["regtest", "signet", "testnet", "mainnet"]).default("regtest"),
   DB_PATH: RepoPath.default("data/kola.sqlite"),
   MEMBER_NODES: MemberNodes.default(
-    "alice=https://localhost:8082,bob=https://localhost:8083,carol=https://localhost:8084",
+    "alice=https://localhost:8082,bob=https://localhost:8083,carol=https://localhost:8084,dave=https://localhost:8085,erin=https://localhost:8086,frank=https://localhost:8087",
   ),
+  /**
+   * Lets the welcome screen offer one-tap demo people (their backup codes, PIN
+   * 123456). Only ever honoured on regtest: the route refuses on any other network.
+   */
+  DEMO_MODE: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
   /** How long members have to pay their share once a round opens (demo: minutes; production ≤ 24h). */
   CONTRIBUTION_WINDOW_SECONDS: z.coerce.number().int().min(30).max(24 * 3600).default(300),
   /**

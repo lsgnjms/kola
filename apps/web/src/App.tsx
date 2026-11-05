@@ -1,13 +1,25 @@
+import type { DemoPerson } from "@kola/shared";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { ApiClient, ApiError } from "./api/client.js";
-import { detectLocale, I18nContext, LOCALES, t as translate, type I18n, type Locale } from "./i18n/index.js";
+import {
+  detectLocale,
+  I18nContext,
+  loadLocale,
+  LOCALES,
+  rememberLocale,
+  t as translate,
+  type I18n,
+  type Locale,
+} from "./i18n/index.js";
+import { Logo, Settings as SettingsIcon, Users, Wallet } from "./icons.js";
 import { idbStorage } from "./keys/idbStorage.js";
 import { Keystore } from "./keys/keystore.js";
-import { Home } from "./screens/Home.js";
 import { Backup } from "./screens/Backup.js";
+import { Home } from "./screens/Home.js";
 import { Onboarding } from "./screens/Onboarding.js";
 import { Pay } from "./screens/Pay.js";
 import { Restore } from "./screens/Restore.js";
+import { Settings } from "./screens/Settings.js";
 import { Unlock } from "./screens/Unlock.js";
 import { ErrorMessage, Screen } from "./ui.js";
 
@@ -16,6 +28,8 @@ const CirclesSection = lazy(() => import("./screens/circles/CirclesSection.js"))
 
 /** Lock again after this long in the background. */
 const AUTO_LOCK_MS = 5 * 60 * 1000;
+/** The published PIN of the regtest demo people. */
+const DEMO_PIN = "123456";
 
 type Session =
   | { state: "loading" }
@@ -25,18 +39,34 @@ type Session =
   | { state: "setup"; error?: unknown }
   | { state: "ready" };
 
-type View = "home" | "receive" | "pay" | "circles" | "backup";
+type Tab = "wallet" | "circles" | "settings";
+type View = "home" | "receive" | "pay" | "circles" | "settings" | "backup";
+
+const TAB_OF: Record<View, Tab> = {
+  home: "wallet",
+  receive: "wallet",
+  pay: "wallet",
+  circles: "circles",
+  settings: "settings",
+  backup: "settings",
+};
 
 const keystore = new Keystore(idbStorage);
 
 export function App() {
-  const [locale, setLocale] = useState<Locale>(detectLocale);
+  const [locale, setLocaleState] = useState<Locale>("en");
   const [session, setSession] = useState<Session>({ state: "loading" });
   const [view, setView] = useState<View>("home");
+  const [demoPeople, setDemoPeople] = useState<DemoPerson[]>([]);
+
+  const setLocale = useCallback((next: Locale) => {
+    rememberLocale(next);
+    void loadLocale(next).then(() => setLocaleState(next));
+  }, []);
 
   const i18n = useMemo<I18n>(
     () => ({ locale, setLocale, t: (key, vars) => translate(locale, key, vars) }),
-    [locale],
+    [locale, setLocale],
   );
   const { t } = i18n;
 
@@ -45,13 +75,16 @@ export function App() {
     [],
   );
 
+  useEffect(() => setLocale(detectLocale()), [setLocale]);
+
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
 
   useEffect(() => {
     void keystore.status().then((s) => setSession({ state: s === "none" ? "onboarding" : "locked" }));
-  }, []);
+    void api.demoPeople().then(setDemoPeople);
+  }, [api]);
 
   const lock = useCallback(() => {
     keystore.lock();
@@ -74,11 +107,16 @@ export function App() {
     setSession({ state: "setup" });
     try {
       await api.claim();
+      setView("home");
       setSession({ state: "ready" });
     } catch (error) {
       setSession({ state: "setup", error });
     }
   }, [api]);
+
+  const openDemoPerson = async (person: DemoPerson) => {
+    if (await keystore.restore(person.backup, DEMO_PIN)) await setUpWallet();
+  };
 
   let content;
   switch (session.state) {
@@ -93,6 +131,8 @@ export function App() {
             await setUpWallet();
           }}
           onRestore={() => setSession({ state: "restoring" })}
+          demoPeople={demoPeople}
+          onDemoPerson={openDemoPerson}
         />
       );
       break;
@@ -121,7 +161,9 @@ export function App() {
         />
       );
       break;
-    case "setup":
+    case "setup": {
+      // This key has no wallet to lose, so swapping it for a demo person or a backup is safe.
+      const full = session.error instanceof ApiError && session.error.code === "no_wallet_available";
       content = (
         <Screen title={t("setup.working")}>
           {session.error === undefined ? (
@@ -129,13 +171,16 @@ export function App() {
           ) : (
             <>
               <ErrorMessage error={session.error} />
-              <button type="button" className="primary" onClick={() => void setUpWallet()}>
+              {full && demoPeople.length > 0 && (
+                <button type="button" className="primary" onClick={() => setSession({ state: "onboarding" })}>
+                  {t("setup.tryDemo")}
+                </button>
+              )}
+              <button type="button" className={full ? "secondary" : "primary"} onClick={() => void setUpWallet()}>
                 {t("common.retry")}
               </button>
-              {/* This key has no wallet to lose, so swapping it for a backup is safe. Otherwise a
-                  phone holding an old key could never reach restore: it unlocks straight to here. */}
-              {session.error instanceof ApiError && session.error.code === "no_wallet_available" && (
-                <button type="button" className="secondary" onClick={() => setSession({ state: "restoring" })}>
+              {full && (
+                <button type="button" className="ghost" onClick={() => setSession({ state: "restoring" })}>
                   {t("restore.start")}
                 </button>
               )}
@@ -144,6 +189,7 @@ export function App() {
         </Screen>
       );
       break;
+    }
     case "ready":
       content =
         view === "circles" ? (
@@ -154,28 +200,43 @@ export function App() {
           <Suspense fallback={<p aria-busy="true">{t("common.loading")}</p>}>
             <Receive api={api} onDone={() => setView("home")} />
           </Suspense>
-        ) : view === "backup" ? (
-          <Backup keystore={keystore} onDone={() => setView("home")} />
         ) : view === "pay" ? (
           <Pay api={api} onDone={() => setView("home")} />
+        ) : view === "settings" ? (
+          <Settings onBackup={() => setView("backup")} onLock={lock} />
+        ) : view === "backup" ? (
+          <Backup keystore={keystore} onDone={() => setView("settings")} />
         ) : (
           <Home
             api={api}
             onReceive={() => setView("receive")}
             onPay={() => setView("pay")}
-            onBackup={() => setView("backup")}
-            onLock={lock}
+            onCircles={() => setView("circles")}
           />
         );
       break;
   }
 
+  const tabs: { tab: Tab; view: View; label: string; icon: JSX.Element }[] = [
+    { tab: "wallet", view: "home", label: t("nav.wallet"), icon: <Wallet /> },
+    { tab: "circles", view: "circles", label: t("nav.circles"), icon: <Users /> },
+    { tab: "settings", view: "settings", label: t("nav.settings"), icon: <SettingsIcon /> },
+  ];
+
   return (
     <I18nContext.Provider value={i18n}>
-      <main className="screen">
-        <header className="header">
-          <h1>{t("app.name")}</h1>
-          <select aria-label={t("app.language")} value={locale} onChange={(e) => setLocale(e.target.value as Locale)}>
+      <div className="app">
+        <header className="topbar">
+          <span className="brand">
+            <Logo size={30} />
+            {t("app.name")}
+          </span>
+          <select
+            className="lang"
+            aria-label={t("app.language")}
+            value={locale}
+            onChange={(e) => setLocale(e.target.value as Locale)}
+          >
             {LOCALES.map((l) => (
               <option key={l} value={l}>
                 {l.toUpperCase()}
@@ -183,18 +244,26 @@ export function App() {
             ))}
           </select>
         </header>
-        {session.state === "ready" && (
-          <nav className="tabs" aria-label={t("app.name")}>
-            <button type="button" aria-current={view !== "circles" ? "page" : undefined} onClick={() => setView("home")}>
-              {t("nav.wallet")}
-            </button>
-            <button type="button" aria-current={view === "circles" ? "page" : undefined} onClick={() => setView("circles")}>
-              {t("nav.circles")}
-            </button>
-          </nav>
-        )}
-        {content}
-      </main>
+        <main>{content}</main>
+      </div>
+      {session.state === "ready" && (
+        <nav className="tabbar" aria-label={t("app.name")}>
+          <div className="tabbar-inner">
+            {tabs.map(({ tab, view: target, label, icon }) => (
+              <button
+                key={tab}
+                type="button"
+                className="tab"
+                aria-current={TAB_OF[view] === tab ? "page" : undefined}
+                onClick={() => setView(target)}
+              >
+                {icon}
+                {label}
+              </button>
+            ))}
+          </div>
+        </nav>
+      )}
     </I18nContext.Provider>
   );
 }

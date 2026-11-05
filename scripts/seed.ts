@@ -12,7 +12,8 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { createDemo } from "./demo.js";
 
 const COMPOSE = ["compose", "-f", "infra/docker-compose.yml"];
-const MEMBERS = ["alice", "bob", "carol"] as const;
+/** alice/bob/carol host the demo people; the rest are spare wallets for brand-new accounts. */
+const MEMBERS = ["alice", "bob", "carol", "dave", "erin", "frank"] as const;
 const COORDINATOR = "coordinator";
 const CHANNEL_SAT = 1_000_000;
 const RPC_USER = process.env.BITCOIND_RPC_USER ?? "kola";
@@ -179,10 +180,12 @@ async function main(): Promise<void> {
 
   console.log("Opening channels…");
   const coordinatorPubkey = pubkey(COORDINATOR);
-  for (const m of MEMBERS) {
-    openChannel(m, COORDINATOR, coordinatorPubkey);
-    openChannel(COORDINATOR, m, pubkey(m));
-  }
+  // LND allows one pending channel per peer pair, so confirm the members' channels
+  // before the coordinator opens its own in the other direction.
+  for (const m of MEMBERS) openChannel(m, COORDINATOR, coordinatorPubkey);
+  mine(6);
+  for (const node of nodes) await waitSynced(node);
+  for (const m of MEMBERS) openChannel(COORDINATOR, m, pubkey(m));
   mine(6);
 
   // After a Docker restart containers get new IPs, so LND can't reach the addresses it saved.

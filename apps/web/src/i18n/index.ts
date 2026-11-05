@@ -1,6 +1,5 @@
 import { createContext, useContext } from "react";
 import en from "./en.json";
-import fr from "./fr.json";
 
 export const LOCALES = ["en", "fr"] as const;
 export type Locale = (typeof LOCALES)[number];
@@ -8,17 +7,42 @@ export type Locale = (typeof LOCALES)[number];
 /** English is the reference catalogue; other locales must have the same keys. */
 export type MessageKey = keyof typeof en;
 
-const CATALOGUES: Record<Locale, Record<MessageKey, string>> = { en, fr };
+/**
+ * English ships in the first download; other languages are fetched when chosen,
+ * which keeps the initial bundle small on slow networks.
+ */
+const CATALOGUES: Partial<Record<Locale, Record<MessageKey, string>>> = { en };
 
-/** Looks up a message and fills `{name}` placeholders. */
-export function t(locale: Locale, key: MessageKey, vars: Record<string, string | number> = {}): string {
-  return CATALOGUES[locale][key].replace(/\{(\w+)\}/g, (match, name: string) =>
-    name in vars ? String(vars[name]) : match,
-  );
+export async function loadLocale(locale: Locale): Promise<void> {
+  if (CATALOGUES[locale]) return;
+  if (locale === "fr") CATALOGUES.fr = (await import("./fr.json")).default;
 }
 
+/** Looks up a message and fills `{name}` placeholders. Falls back to English until a catalogue loads. */
+export function t(locale: Locale, key: MessageKey, vars: Record<string, string | number> = {}): string {
+  const catalogue = CATALOGUES[locale] ?? en;
+  return catalogue[key].replace(/\{(\w+)\}/g, (match, name: string) => (name in vars ? String(vars[name]) : match));
+}
+
+const STORAGE_KEY = "kola.locale";
+
+/** The member's earlier choice, else the phone's language. */
 export function detectLocale(): Locale {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved === "en" || saved === "fr") return saved;
+  } catch {
+    // Storage blocked (private mode): fall back to the browser language.
+  }
   return navigator.language.toLowerCase().startsWith("fr") ? "fr" : "en";
+}
+
+export function rememberLocale(locale: Locale): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, locale);
+  } catch {
+    // Not remembered; harmless.
+  }
 }
 
 export type Translate = (key: MessageKey, vars?: Record<string, string | number>) => string;

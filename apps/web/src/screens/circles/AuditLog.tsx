@@ -2,6 +2,7 @@ import { auditCircle, type AuditResult, type CircleView } from "@kola/shared";
 import { useCallback, useEffect, useState } from "react";
 import { formatSat, formatTime } from "../../format.js";
 import { useI18n } from "../../i18n/index.js";
+import { Check, Refresh, Shield } from "../../icons.js";
 import { describeEntry, fetchRecord } from "./record.js";
 
 /** Lazy-loaded: the relay client is only downloaded when someone opens the record. */
@@ -33,9 +34,9 @@ export default function AuditLog({ view }: { view: CircleView }) {
     view.members.find((m) => m.pubkey === pubkey)?.nickname ?? `${pubkey.slice(0, 8)}…`;
 
   return (
-    <section className="round" aria-busy={loading}>
+    <section className="card" aria-busy={loading}>
       <h3>{t("audit.title")}</h3>
-      <p>{t("audit.explain")}</p>
+      <p className="hint">{t("audit.explain")}</p>
       {loading && <p>{t("common.loading")}</p>}
       {unreachable && (
         <p className="notice notice-error" role="alert">
@@ -52,21 +53,28 @@ export default function AuditLog({ view }: { view: CircleView }) {
         </div>
       )}
       {result && result.entries.length > 0 && result.problems.length === 0 && (
-        <p className="notice" role="status">
-          ✓ {t("audit.allGood", { count: result.entries.length })}
+        <p className="notice notice-ok benefit" role="status">
+          <Shield size={20} />
+          <span>{t("audit.allGood", { count: result.entries.length })}</span>
         </p>
       )}
       {result && result.entries.length > 0 && (
-        <ol className="members">
+        <ol className="list">
           {result.entries.map((entry) => (
-            <li key={entry.id}>
-              <span>{describeEntry(t, entry, nameOf, (amount) => formatSat(locale, amount))}</span>
-              <small>{formatTime(locale, entry.createdAtS * 1000)}</small>
+            <li key={entry.id} className="row">
+              <span className="tx-icon" style={{ width: 32, height: 32 }}>
+                <Check size={16} />
+              </span>
+              <span className="row-main">
+                <span>{describeEntry(t, entry, nameOf, (amount) => formatSat(locale, amount))}</span>
+                <span className="row-sub">{formatTime(locale, entry.createdAtS * 1000)}</span>
+              </span>
             </li>
           ))}
         </ol>
       )}
       <button type="button" className="secondary" disabled={loading} onClick={() => void load()}>
+        <Refresh size={20} />
         {t("home.refresh")}
       </button>
     </section>
