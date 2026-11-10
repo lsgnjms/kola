@@ -1,5 +1,5 @@
 /**
- * Demo state: three members (Aminata, Fatou, Moussa) with funded regtest
+ * Demo state: three members (Khady, Ousmane, Mariama) with funded regtest
  * wallets in an active circle, round 1 ready to start. Writes each member's
  * backup code (PIN 123456) to data/demo/ so demo phones can "Restore from a backup".
  *
@@ -24,7 +24,7 @@ import { WalletBindings } from "../apps/api/src/wallet/bindings.js";
 
 const DEMO_PIN = "123456";
 const JOIN_CODE = "DAKAR2";
-const MEMBERS = ["Aminata", "Fatou", "Moussa"] as const;
+const MEMBERS = ["Khady", "Ousmane", "Mariama"] as const;
 const CONTRIBUTION_SAT = 10_000;
 
 export async function createDemo(): Promise<void> {
@@ -61,7 +61,7 @@ export async function createDemo(): Promise<void> {
 
     store.createCircle({
       id: circleId,
-      name: "Marché HLM tontine",
+      name: "Sandaga market tontine",
       contributionSat: CONTRIBUTION_SAT,
       memberCount: MEMBERS.length,
       periodSeconds: 7 * 24 * 3600,
@@ -111,9 +111,9 @@ export async function createDemo(): Promise<void> {
 
     writeFileSync(
       join(demoDir, "README.txt"),
-      `Kola demo identities (regtest only). On each phone: "I already have a backup",\npaste one code, PIN ${DEMO_PIN}. Aminata is the organizer.\n`,
+      `Kola demo identities (regtest only). On each phone: "I already have a backup",\npaste one code, PIN ${DEMO_PIN}. Khady is the organizer.\n`,
     );
-    console.log(`Demo circle "Marché HLM tontine" (code ${JOIN_CODE}) is ready; round 1 can start.`);
+    console.log(`Demo circle "Sandaga market tontine" (code ${JOIN_CODE}) is ready; round 1 can start.`);
     printBackups(demoDir);
   } finally {
     db.close();

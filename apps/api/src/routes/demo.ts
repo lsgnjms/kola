@@ -5,9 +5,9 @@ import type { Env } from "../env.js";
 
 /** Same people, order and files as scripts/demo.ts. */
 const DEMO_PEOPLE = [
-  { nickname: "Aminata", role: "organizer" },
-  { nickname: "Fatou", role: "member" },
-  { nickname: "Moussa", role: "member" },
+  { nickname: "Khady", role: "organizer" },
+  { nickname: "Ousmane", role: "member" },
+  { nickname: "Mariama", role: "member" },
 ] as const;
 
 /**

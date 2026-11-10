@@ -25,7 +25,7 @@ A mobile-first PWA where a group runs a savings circle over Lightning:
 4. **AI assistant**: plain-language reminders and Q&A ("When is my turn?", "Who hasn't paid?"). It only reads circle state and can never move money. Stretch: voice notes in Wolof / Yoruba / Pidgin.
 
 ### Primary user
-**Aminata, 34, fabric seller at Marché HLM in Dakar.** Mid-range Android, patchy 3G, runs a 10-person tontine with fellow traders. She wants to stop carrying cash and stop arguing about who paid.
+**Khady, 34, fabric seller at Sandaga market in Dakar.** Mid-range Android, patchy 3G, runs a 10-person tontine with fellow traders. She wants to stop carrying cash and stop arguing about who paid.
 
 ### Reach estimate (for the pitch)
 One circle = ~10 members × 52 weekly contributions = 520 payments/year. A single market with 50 circles ≈ 26,000 payments/year. Track: circles created, on-time payment rate, payout success rate, disputes raised.
@@ -150,7 +150,7 @@ No names, phone numbers or amounts in fiat on the relay. Display names stay loca
 Build in public throughout: short progress posts (X / Nostr) and updates in the BTrust Discord, since organizers asked for it.
 
 ## 9. Demo script (3 minutes)
-1. **Problem (30s):** Aminata's tontine, the collector who vanished, the notebook.
+1. **Problem (30s):** Khady's tontine, the collector who vanished, the notebook.
 2. **Solution (90s):**
    - Create a 3-person circle, others join via link.
    - Cycle 1: all three pay → pot lands in Alice's wallet instantly → show the Nostr audit trail.

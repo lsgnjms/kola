@@ -92,9 +92,9 @@ console.log(`
   Kola is starting. Open:
 ${urls.map((u) => `    ${u}`).join("\n")}
 
-  Try it: tap "Aminata" on the welcome screen (demo PIN 123456),
-  open the Marché HLM circle and tap "Start round 1".
-  Switch to Fatou and Moussa in Settings to pay their shares.
+  Try it: tap "Khady" on the welcome screen (demo PIN 123456),
+  open the Sandaga market circle and tap "Start round 1".
+  Switch to Ousmane and Mariama in Settings to pay their shares.
 
   Ctrl+C stops the app. Before shutting down your computer,
   run "pnpm stack:stop" to stop the test network cleanly.
