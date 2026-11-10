@@ -4,7 +4,7 @@ import type { ApiClient } from "../api/client.js";
 import { formatSat } from "../format.js";
 import { useI18n } from "../i18n/index.js";
 import { ArrowUp, Check, Clipboard, Clock } from "../icons.js";
-import { ErrorMessage, Screen } from "../ui.js";
+import { ErrorMessage, Screen, Fiat } from "../ui.js";
 
 type Step =
   | { name: "enter" }
@@ -77,6 +77,7 @@ export function Pay({ api, onDone }: { api: ApiClient; onDone: () => void }) {
           <p className="big">
             {formatSat(locale, step.decoded.amountSat)} <span className="muted">sats</span>
           </p>
+          <Fiat amountSat={step.decoded.amountSat} />
           <p className="hint">{t("pay.confirmAmount", { amount: formatSat(locale, step.decoded.amountSat) })}</p>
         </div>
         <button type="button" className="primary" disabled={sending} onClick={() => void pay(step.decoded)}>

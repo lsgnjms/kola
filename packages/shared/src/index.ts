@@ -9,3 +9,4 @@ export * from "./nostr/audit.js";
 export * from "./api/wallet.js";
 export * from "./api/circles.js";
 export * from "./api/assistant.js";
+export * from "./api/rates.js";

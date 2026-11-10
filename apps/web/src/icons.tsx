@@ -143,6 +143,20 @@ export const ChevronRight = (p: IconProps) => (
     <path d="M9 18l6-6-6-6" />
   </Svg>
 );
+export const Banknote = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="2" y="6" width="20" height="12" rx="2" />
+    <circle cx="12" cy="12" r="2.5" />
+    <path d="M6 12h.01M18 12h.01" />
+  </Svg>
+);
+
+export const Message = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22z" />
+  </Svg>
+);
+
 export const Bolt = (p: IconProps) => (
   <Svg {...p}>
     <path d="M13 2L4 14h7l-1 8 9-12h-7z" />

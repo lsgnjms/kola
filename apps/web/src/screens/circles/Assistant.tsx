@@ -4,7 +4,7 @@ import type { ApiClient } from "../../api/client.js";
 import { copyText } from "../../clipboard.js";
 import { formatSat } from "../../format.js";
 import { useI18n } from "../../i18n/index.js";
-import { ErrorMessage } from "../../ui.js";
+import { ErrorMessage, WhatsAppButton } from "../../ui.js";
 import { quickAnswer, type QuickQuestion } from "./quickAnswers.js";
 
 const QUICK: { question: QuickQuestion; label: "assistant.whoseTurn" | "assistant.whoOwes" | "assistant.reminder" }[] = [
@@ -60,9 +60,11 @@ export default function Assistant({ api, view }: { api: ApiClient; view: CircleV
             key={q}
             type="button"
             className="secondary"
-            onClick={() =>
-              show(quickAnswer(t, view, q, Date.now(), (amount) => formatSat(locale, amount)), q === "reminder")
-            }
+            onClick={() => {
+              const text = quickAnswer(t, view, q, Date.now(), (amount) => formatSat(locale, amount));
+              // Only a real reminder is worth copying or sending, not "nobody needs one".
+              show(text, q === "reminder" && text !== t("answer.reminderNone"));
+            }}
           >
             {t(label)}
           </button>
@@ -91,6 +93,7 @@ export default function Assistant({ api, view }: { api: ApiClient; view: CircleV
               {copied ? t("common.copied") : t("common.copy")}
             </button>
           )}
+          {answer.copyable && <WhatsAppButton text={answer.text} />}
         </div>
       )}
       <small className="muted">{t(mode === "ai" ? "assistant.aiNote" : "assistant.templatedNote")}</small>

@@ -9,7 +9,7 @@ Built for the **Dakar Bitcoin Hack 2026 by BTrust**. Open source (MIT). Bitcoin 
 <p align="center">
   <img src="docs/screenshots/welcome.png" width="200" alt="Welcome screen with one-tap demo people">
   <img src="docs/screenshots/round-in-progress.png" width="200" alt="A round in progress: two of three paid, countdown running">
-  <img src="docs/screenshots/round-paid.png" width="200" alt="Round complete: Aminata received 30,000 sats">
+  <img src="docs/screenshots/round-paid.png" width="200" alt="Round complete: Khady received 30,000 sats">
   <img src="docs/screenshots/wallet.png" width="200" alt="Wallet with balance and recent activity">
 </p>
 
@@ -26,7 +26,7 @@ They run on trust, and the trust is where they break:
 - **Late payers.** Chasing them is manual and awkward.
 - **Distance.** Members who travel or work abroad struggle to pay in cash.
 
-**Our user:** Aminata, 34, sells fabric at Marché HLM in Dakar. Mid-range Android, patchy 3G, runs a 10-person tontine with fellow traders. She wants to stop carrying cash and stop arguing about who paid.
+**Our user:** Khady, 34, sells fabric at Sandaga market in Dakar. Mid-range Android, patchy 3G, runs a 10-person tontine with fellow traders. She wants to stop carrying cash and stop arguing about who paid.
 
 ## How Kola works
 
@@ -35,7 +35,8 @@ They run on trust, and the trust is where they break:
 3. **When the last person pays,** all shares are collected at once and the pot goes **straight to that round's recipient**, in seconds.
 4. **If the deadline passes and someone hasn't paid,** every share is **returned automatically**. No one has to chase anyone, and no one loses money.
 5. **Every step is signed and published** to a public record (Nostr). Each member's phone checks the signatures and the payment proofs itself, so the history can't be quietly rewritten.
-6. **An assistant answers** "Whose turn is it?", "Who still owes?" and drafts a friendly reminder, in English or French.
+6. **An assistant answers** "Whose turn is it?", "Who still owes?" and drafts a friendly reminder, in English or French. Invites and reminders go out on **WhatsApp** in one tap, where the group already talks.
+7. **Amounts show in FCFA or naira** next to sats ("30,000 sats ≈ 13,000 FCFA"), so nobody has to do the maths.
 
 This works because of a Lightning feature called **hold invoices**: a payment can be held, then either completed or cancelled. Kola only completes them when *every* member has paid.
 
@@ -64,13 +65,13 @@ The first run downloads the Docker images and funds the test wallets, so it take
 
 ### A full round in one browser
 
-1. On the welcome screen, tap **Aminata** (the organiser). Demo PIN, if asked: `123456`.
-2. **Circles → Marché HLM tontine → Start round 1**, then **Pay my share**.
-3. **Settings → Switch demo person → Fatou**, open the circle, **Pay my share**.
-4. **Settings → Moussa**, **Pay my share**. All three have paid, so the 30,000 sats pot goes to Aminata immediately.
+1. On the welcome screen, tap **Khady** (the organiser). Demo PIN, if asked: `123456`.
+2. **Circles → Sandaga market tontine → Start round 1**, then **Pay my share**.
+3. **Settings → Switch demo person → Ousmane**, open the circle, **Pay my share**.
+4. **Settings → Mariama**, **Pay my share**. All three have paid, so the 30,000 sats pot goes to Khady immediately.
 5. Tap **Record** to see the signed public record, verified on your device.
 
-**See the refund:** Aminata starts the next round, only two people pay, and after the 2-minute deadline everyone's money comes back. Check any wallet's activity.
+**See the refund:** Khady starts the next round, only two people pay, and after the 2-minute deadline everyone's money comes back. Check any wallet's activity.
 
 **Start from scratch instead:** in a private window, tap **Get started**, choose a PIN, and create your own circle. Three spare wallets let you run a circle of brand-new accounts: use a different browser or browser profile for each person, because one browser holds one account at a time.
 
@@ -146,7 +147,7 @@ flowchart LR
 ```mermaid
 sequenceDiagram
   autonumber
-  participant O as Organiser (Aminata)
+  participant O as Organiser (Khady)
   participant M as Members
   participant K as Kola engine
   participant L as Coordinator LND
@@ -207,6 +208,8 @@ The full analysis is in **[docs/threat-model.md](docs/threat-model.md)**. Highli
 - Plain words. No jargon: shares are "set aside", not "HTLCs".
 - Every error says **whether money moved**: "Your money is still in your wallet."
 - English and French throughout, with automated checks that both languages have every message.
+- **Installable:** add Kola to the home screen like an app. It opens even on a dead connection (balances and payments always come live from the server, never from a stale copy).
+- **Local money:** an approximate FCFA or naira value under every amount (changeable in Settings). The price is fetched by the server, so phones never contact a price site, and it is display only: every payment is in sats.
 
 ---
 
@@ -221,7 +224,8 @@ The full analysis is in **[docs/threat-model.md](docs/threat-model.md)**. Highli
 | **Missed payments** | The whole round is cancelled and refunded. Some groups would prefer to go ahead and record the default instead; this is still an open question for real tontine members. |
 | **Public record** | One relay. Tampering is detected; a relay hiding a whole round is not (multiple relays would fix this). The app learns the coordinator's key from the API. |
 | **Database** | SQLite is a cache rebuilt from Lightning and the relay. A one-command rebuild is not written yet, and names stay off the relay by design. |
-| **Not built yet** | Install-to-home-screen (PWA offline), QR scanning (paste works), local-currency display. |
+| **Not built yet** | QR scanning (paste works). |
+| **Local currency** | Indicative only, from CoinGecko (falling back to mempool.space and the fixed euro–FCFA peg). If both are down the app shows sats only. |
 
 ## Metrics we would track
 
@@ -244,7 +248,7 @@ Almost all of these can be computed **from the public record itself**, without c
 2. **Pilot with one real group** in Dakar or Lagos on signet, then mainnet with small amounts. Settle the missed-payment policy with them.
 3. **Voice in local languages** (Wolof, Yoruba, Pidgin) for reminders and the assistant.
 4. **Several relays,** and pinning the coordinator's key in the circle invitation, so the record can't be hidden or substituted.
-5. **Local-currency display** (XOF / NGN) fixed at the time of payment, installable PWA with offline support, and QR scanning.
+5. **Receipts in local currency** fixed at the time of payment, QR scanning, and WhatsApp reminders sent automatically before the deadline.
 6. **Rebuild command** that restores the cache from Lightning and the relay.
 
 ---

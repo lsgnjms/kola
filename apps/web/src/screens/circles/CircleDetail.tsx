@@ -5,7 +5,7 @@ import { copyText } from "../../clipboard.js";
 import { formatSat } from "../../format.js";
 import { useI18n } from "../../i18n/index.js";
 import { Check, Clock, Copy, Receipt, Share, Sparkles } from "../../icons.js";
-import { ActionButton, Avatar, ErrorMessage, Screen } from "../../ui.js";
+import { ActionButton, Avatar, ErrorMessage, Screen, Fiat, WhatsAppButton } from "../../ui.js";
 import { canPay, canStartRound, formatCountdown, isLive, memberAt, myContribution, nextRoundNumber } from "./model.js";
 
 const AuditLog = lazy(() => import("./AuditLog.js"));
@@ -102,6 +102,7 @@ export function CircleDetail({ api, id, onBack }: { api: ApiClient; id: string; 
           {sats(cycle?.potSat ?? potSat)}
           <span className="hero-unit">sats</span>
         </span>
+        <Fiat amountSat={cycle?.potSat ?? potSat} className="hero-fiat" />
         <span className="hero-label">
           {t("circles.summary", { amount: sats(view.contributionSat), joined: view.members.length, total: view.memberCount })}
         </span>
@@ -145,6 +146,14 @@ export function CircleDetail({ api, id, onBack }: { api: ApiClient; id: string; 
             <Copy size={20} />
             {copied ? t("common.copied") : t("common.copy")}
           </button>
+          <WhatsAppButton
+            text={t("circle.inviteMessage", {
+              name: view.name,
+              amount: sats(view.contributionSat),
+              code: view.joinCode,
+              url: location.origin,
+            })}
+          />
           {view.isCreator && <p className="hint">{t("circle.notReady")}</p>}
         </div>
       )}

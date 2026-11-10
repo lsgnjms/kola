@@ -92,6 +92,14 @@ wallet; with NWC/mainnet we would add a longer passphrase option and key backup.
 - NIP-98 signatures name the URL the browser used; the API accepts only the
   URLs listed in `PUBLIC_API_URLS`, so a request signed for another host fails.
 
+### Outbound: price feed
+
+The API makes plain HTTPS GETs to `api.coingecko.com` and `mempool.space` for the BTC price, with a 5 s timeout. Nothing about members, circles or wallets is sent. Responses are parsed defensively (non-positive or non-numeric prices are ignored); on failure the last good price is kept, or the app shows sats only. The feed only learns the server’s IP.
+
+### Outbound: WhatsApp share links
+
+“Send on WhatsApp” is a plain `https://wa.me/?text=…` link the member taps. The app sends nothing itself: WhatsApp opens with the message pre-filled and the member chooses the chat. The invite contains the circle name, amount and join code (which the member is choosing to share); reminders contain nicknames and amounts. No keys, invoices or wallet details are ever included.
+
 ## Public record (Nostr)
 
 What goes on the relay: pubkeys, amounts in sats, deadlines, payment hashes, and
@@ -115,6 +123,7 @@ server's `/relay` path.
 |---|---|---|---|
 | `GET /health` | none | global 100/min | Reveals only whether AI is enabled |
 | `GET /demo/people` | none | global | Exists only with `DEMO_MODE=true` **and** regtest; returns the demo people's backup codes (published PIN). Regtest throwaway keys, test money only |
+| `GET /rates` | none | global | Indicative BTC price in FCFA/naira for display. Fetched by the server (CoinGecko, falling back to mempool.space EUR × the fixed 655.957 peg), cached 10 min. Phones never contact the price feed. A wrong price can only mislabel the “≈” figure: amounts, invoices and payouts are in sats and never use it |
 | `POST /wallet/claim` | NIP-98 | global | Binds a free demo node; 409 when none left |
 | `GET /wallet/balance` | NIP-98 | global | |
 | `POST /wallet/invoices` | NIP-98 | global; amount ≤ `MAX_PAYMENT_SAT` | Fixed memo (no user text in invoices) |

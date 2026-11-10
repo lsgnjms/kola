@@ -2,7 +2,7 @@ import { useId, useState, type FormEvent } from "react";
 import type { ApiClient } from "../../api/client.js";
 import { formatSat } from "../../format.js";
 import { useI18n } from "../../i18n/index.js";
-import { ErrorMessage, Screen } from "../../ui.js";
+import { ErrorMessage, Screen, Fiat } from "../../ui.js";
 
 const SIZES = [2, 3, 4, 5, 6, 8, 10, 12];
 
@@ -109,6 +109,7 @@ export function CreateCircle({
               {formatSat(locale, contributionSat * memberCount)}
               <span className="hero-unit">sats</span>
             </span>
+            <Fiat amountSat={contributionSat * memberCount} className="hero-fiat" />
             <span className="hero-label">{t("create.potExplain", { people: memberCount })}</span>
           </div>
         )}

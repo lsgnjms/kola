@@ -1,13 +1,16 @@
-import type { DemoPerson } from "@kola/shared";
+import type { DemoPerson, FiatRates } from "@kola/shared";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { ApiClient, ApiError } from "./api/client.js";
 import {
+  detectCurrency,
   detectLocale,
   I18nContext,
   loadLocale,
   LOCALES,
+  rememberCurrency,
   rememberLocale,
   t as translate,
+  type CurrencyChoice,
   type I18n,
   type Locale,
 } from "./i18n/index.js";
@@ -21,6 +24,7 @@ import { Pay } from "./screens/Pay.js";
 import { Restore } from "./screens/Restore.js";
 import { Settings } from "./screens/Settings.js";
 import { Unlock } from "./screens/Unlock.js";
+import { formatFiat } from "./format.js";
 import { ErrorMessage, Screen } from "./ui.js";
 
 const Receive = lazy(() => import("./screens/Receive.js"));
@@ -69,6 +73,8 @@ export function App() {
   const [view, setView] = useState<View>("home");
   // Bumped when the current tab is tapped again, which takes that tab back to its first screen.
   const [tabReset, setTabReset] = useState(0);
+  const [currency, setCurrencyState] = useState<CurrencyChoice>(detectCurrency);
+  const [rates, setRates] = useState<FiatRates>({});
   const [demoPeople, setDemoPeople] = useState<DemoPerson[]>([]);
   const [activeDemo, setActiveDemo] = useState<string | null>(readActiveDemo);
 
@@ -88,9 +94,21 @@ export function App() {
     void loadLocale(next).then(() => setLocaleState(next));
   }, []);
 
+  const setCurrency = useCallback((next: CurrencyChoice) => {
+    rememberCurrency(next);
+    setCurrencyState(next);
+  }, []);
+
   const i18n = useMemo<I18n>(
-    () => ({ locale, setLocale, t: (key, vars) => translate(locale, key, vars) }),
-    [locale, setLocale],
+    () => ({
+      locale,
+      setLocale,
+      t: (key, vars) => translate(locale, key, vars),
+      currency,
+      setCurrency,
+      fiat: (amountSat) => (currency === "off" ? null : formatFiat(locale, amountSat, currency, rates[currency])),
+    }),
+    [locale, setLocale, currency, setCurrency, rates],
   );
   const { t } = i18n;
 
@@ -108,6 +126,10 @@ export function App() {
   useEffect(() => {
     void keystore.status().then((s) => setSession({ state: s === "none" ? "onboarding" : "locked" }));
     void api.demoPeople().then(setDemoPeople);
+    const loadRates = () => void api.rates().then((r) => Object.keys(r).length > 0 && setRates(r));
+    loadRates();
+    const timer = setInterval(loadRates, 10 * 60 * 1000);
+    return () => clearInterval(timer);
   }, [api]);
 
   const lock = useCallback(() => {

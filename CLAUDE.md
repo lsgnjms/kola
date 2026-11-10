@@ -88,7 +88,8 @@ If a requested change would weaken any of these, stop and flag it instead of imp
 - Plain language in the UI. No "HTLC", "preimage", "macaroon" in user-facing copy. Explain errors and say whether money moved ("Your money is still in your wallet").
 - UI copy in English and French via an i18n file; no hard-coded user-facing strings in components.
 - Large tap targets, accessible contrast, 16px minimum body text.
-- Amounts in sats; show an approximate local currency value only when a rate is available.
+- Amounts in sats; show an approximate local currency value only when a rate is available (`<Fiat>` in `apps/web/src/ui.tsx`, rates from `GET /rates`, FCFA by default, choice in Settings). Display only: never use fiat in money logic.
+- The service worker (`apps/web/public/sw.js`, production builds only) caches the shell and hashed assets; it must never cache `/api` or `/relay`.
 
 ## Code conventions
 
@@ -118,6 +119,6 @@ If a requested change would weaken any of these, stop and flag it instead of imp
 - **After a PC or Docker restart, run `pnpm seed`**: containers get new IPs, so LND needs reconnecting (safe to re-run). `pnpm seed` flushes the chain index when it finishes, but a hard kill with unflushed blocks can leave bitcoind at height 0 while the block files are intact: rebuild with `bitcoind -reindex` instead of wiping anything.
 - Held HTLCs lock liquidity and are bounded by CLTV expiry; keep contribution windows short (minutes in demo, ≤ 24h in production).
 - The coordinator is a trust assumption (it holds funds briefly between settle and payout, and could refuse service). Document it; don't hide it.
-- **Demo flow for judges:** one browser is enough. Tap Aminata on the welcome screen, start round 1, pay, then switch to Fatou and Moussa in Settings (demo switcher, DEMO_MODE only) to pay their shares. Contribution window defaults to 2 minutes so the refund path is quick to show.
-- **Wallet pool:** alice/bob/carol host the demo people (Aminata, Fatou, Moussa); dave/erin/frank are spare wallets for brand-new accounts, so judges can run a whole circle from scratch. With `DEMO_MODE=true` (regtest only) the welcome screen offers the demo people in one tap.
+- **Demo flow for judges:** one browser is enough. Tap Khady on the welcome screen, start round 1, pay, then switch to Ousmane and Mariama in Settings (demo switcher, DEMO_MODE only) to pay their shares. Contribution window defaults to 2 minutes so the refund path is quick to show.
+- **Wallet pool:** alice/bob/carol host the demo people (Khady, Ousmane, Mariama); dave/erin/frank are spare wallets for brand-new accounts, so judges can run a whole circle from scratch. With `DEMO_MODE=true` (regtest only) the welcome screen offers the demo people in one tap.
 - **Demo wallets are custodial.** Member LND nodes sit behind the API, which holds their macaroons. Fine for regtest; say so in the threat model and pitch, and present NWC (members bring their own wallet) as the path out.

@@ -4,7 +4,7 @@ import type { ApiClient } from "../api/client.js";
 import { formatSat, formatTime } from "../format.js";
 import { useI18n } from "../i18n/index.js";
 import { ArrowDown, ArrowUp, Bolt, Cross, Refresh, Users } from "../icons.js";
-import { ActionButton, ErrorMessage } from "../ui.js";
+import { ActionButton, ErrorMessage, Fiat } from "../ui.js";
 
 interface WalletState {
   balanceSat: number;
@@ -59,6 +59,7 @@ export function Home({
           {wallet ? formatSat(locale, wallet.balanceSat) : "…"}
           <span className="hero-unit">sats</span>
         </span>
+        {wallet && <Fiat amountSat={wallet.balanceSat} className="hero-fiat" />}
         <span className="chip">
           <Bolt size={14} />
           {t("home.testMoney")}

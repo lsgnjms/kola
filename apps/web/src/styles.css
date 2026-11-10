@@ -246,6 +246,25 @@ h3 {
   background: rgba(255, 255, 255, 0.08);
 }
 
+.hero-fiat {
+  font-size: 1rem;
+  font-weight: 600;
+  opacity: 0.9;
+  font-variant-numeric: tabular-nums;
+}
+
+.fiat {
+  display: block;
+  color: var(--muted);
+  font-size: 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.big + .fiat {
+  text-align: center;
+  margin-top: -0.5rem;
+}
+
 .hero-label {
   opacity: 0.85;
   font-size: 0.9375rem;
@@ -631,6 +650,14 @@ button {
   background: var(--surface);
   color: var(--fg);
   border: 1.5px solid var(--border);
+}
+
+a.secondary {
+  text-decoration: none;
+}
+
+.whatsapp svg {
+  color: #1da851;
 }
 
 .ghost {

@@ -1,7 +1,7 @@
 import type { DemoPerson } from "@kola/shared";
 import { useState } from "react";
-import { useI18n, LOCALES, type Locale } from "../i18n/index.js";
-import { ChevronRight, Globe, Key, Lock, Shield } from "../icons.js";
+import { CURRENCY_CHOICES, useI18n, LOCALES, type CurrencyChoice, type Locale, type MessageKey } from "../i18n/index.js";
+import { Banknote, ChevronRight, Globe, Key, Lock, Shield } from "../icons.js";
 import { Avatar, Screen } from "../ui.js";
 
 const LANGUAGE_NAME: Record<Locale, string> = { en: "English", fr: "Français" };
@@ -19,7 +19,7 @@ export function Settings({
   activeDemo: string | null;
   onDemoPerson: (person: DemoPerson) => Promise<void>;
 }) {
-  const { t, locale, setLocale } = useI18n();
+  const { t, locale, setLocale, currency, setCurrency } = useI18n();
   const [switching, setSwitching] = useState<string | null>(null);
   return (
     <Screen title={t("settings.title")}>
@@ -75,6 +75,27 @@ export function Settings({
             {LOCALES.map((l) => (
               <option key={l} value={l}>
                 {LANGUAGE_NAME[l]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="row">
+          <span className="tx-icon">
+            <Banknote size={20} />
+          </span>
+          <span className="row-main">
+            <span className="row-title">{t("settings.currency")}</span>
+            <span className="row-sub">{t("settings.currencyHelp")}</span>
+          </span>
+          <select
+            className="lang"
+            aria-label={t("settings.currency")}
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value as CurrencyChoice)}
+          >
+            {CURRENCY_CHOICES.map((c) => (
+              <option key={c} value={c}>
+                {t(`currency.${c}` as MessageKey)}
               </option>
             ))}
           </select>

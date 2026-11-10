@@ -6,7 +6,7 @@ import { copyText } from "../clipboard.js";
 import { formatSat } from "../format.js";
 import { useI18n } from "../i18n/index.js";
 import { Copy, Share } from "../icons.js";
-import { ErrorMessage, Screen } from "../ui.js";
+import { ErrorMessage, Screen, Fiat } from "../ui.js";
 
 const PRESETS_SAT = [1_000, 5_000, 10_000, 20_000];
 
@@ -50,6 +50,7 @@ export default function Receive({ api, onDone }: { api: ApiClient; onDone: () =>
           <p className="big">
             {formatSat(locale, invoice.amountSat)} <span className="muted">sats</span>
           </p>
+          <Fiat amountSat={invoice.amountSat} />
           {/* uqr returns a static SVG string built from the invoice; no user HTML involved. */}
           <div className="qr" role="img" aria-label={t("receive.qrLabel")} dangerouslySetInnerHTML={{ __html: qr }} />
           <p className="hint center">{t("receive.show")}</p>

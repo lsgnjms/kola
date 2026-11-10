@@ -1,3 +1,4 @@
+import type { FiatCurrency } from "@kola/shared";
 import { createContext, useContext } from "react";
 import en from "./en.json";
 
@@ -47,10 +48,37 @@ export function rememberLocale(locale: Locale): void {
 
 export type Translate = (key: MessageKey, vars?: Record<string, string | number>) => string;
 
+/** Which local currency to show next to sats, or none. */
+export type CurrencyChoice = FiatCurrency | "off";
+export const CURRENCY_CHOICES: CurrencyChoice[] = ["XOF", "NGN", "off"];
+const CURRENCY_KEY = "kola.currency";
+
+export function detectCurrency(): CurrencyChoice {
+  try {
+    const saved = localStorage.getItem(CURRENCY_KEY);
+    if (saved === "XOF" || saved === "NGN" || saved === "off") return saved;
+  } catch {
+    // Storage blocked: use the default.
+  }
+  return "XOF";
+}
+
+export function rememberCurrency(choice: CurrencyChoice): void {
+  try {
+    localStorage.setItem(CURRENCY_KEY, choice);
+  } catch {
+    // Not remembered; harmless.
+  }
+}
+
 export interface I18n {
   locale: Locale;
   setLocale: (locale: Locale) => void;
   t: Translate;
+  currency: CurrencyChoice;
+  setCurrency: (choice: CurrencyChoice) => void;
+  /** "≈ 4,343 F CFA" for an amount, or null (no rate yet, currency off, or too small). */
+  fiat: (amountSat: number) => string | null;
 }
 
 export const I18nContext = createContext<I18n | null>(null);

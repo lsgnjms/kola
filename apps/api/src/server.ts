@@ -13,6 +13,7 @@ import { relaySender } from "./circles/relaySender.js";
 import { loadCoordinatorKey, loadPreimageSecret } from "./circles/secret.js";
 import { CircleStore } from "./circles/store.js";
 import { circleRoutes } from "./routes/circles.js";
+import { RateFeed } from "./rates.js";
 import { demoRoutes } from "./routes/demo.js";
 import { lndWalletFromFiles } from "./wallet/lnd/fromFiles.js";
 import { KeyedMutex } from "./wallet/spendCaps.js";
@@ -40,6 +41,7 @@ export interface ServerDeps {
   walletLoader?: WalletLoader;
   coordinatorLoader?: () => Promise<WalletProvider>;
   relaySend?: RelaySend;
+  rates?: RateFeed;
   assistant?: AssistantModel | null;
   nowMs?: () => number;
   /** Run the cycle engine ticker (default true). Tests drive the engine directly. */
@@ -133,6 +135,10 @@ export async function buildServer(env: Env, deps: ServerDeps = {}): Promise<Fast
     publisher.stop();
     db.close();
   });
+
+  // Indicative local-currency prices for the UI (public, cached server-side, no member data).
+  const rates = deps.rates ?? new RateFeed();
+  app.get("/rates", async () => rates.get());
 
   app.get("/health", async () => ({
     status: "ok",

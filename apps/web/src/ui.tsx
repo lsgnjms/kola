@@ -2,7 +2,8 @@ import { useId, type ReactNode } from "react";
 import { ApiError } from "./api/client.js";
 import { describeError } from "./format.js";
 import { useI18n } from "./i18n/index.js";
-import { ChevronLeft } from "./icons.js";
+import { ChevronLeft, Message } from "./icons.js";
+import { whatsappUrl } from "./whatsapp.js";
 
 export function Screen({
   title,
@@ -108,5 +109,23 @@ export function Avatar({ name, small = false }: { name: string; small?: boolean 
     <span className={small ? "avatar avatar-sm" : "avatar"} style={{ background: colour }} aria-hidden="true">
       {name.trim().charAt(0).toUpperCase() || "?"}
     </span>
+  );
+}
+
+/** The approximate local-currency value of an amount, when a rate is available. */
+export function Fiat({ amountSat, className = "fiat" }: { amountSat: number; className?: string }) {
+  const { fiat } = useI18n();
+  const text = fiat(amountSat);
+  return text ? <span className={className}>{text}</span> : null;
+}
+
+/** Opens WhatsApp with `text` ready to send to a chat the member picks. */
+export function WhatsAppButton({ text }: { text: string }) {
+  const { t } = useI18n();
+  return (
+    <a className="secondary whatsapp" href={whatsappUrl(text)} target="_blank" rel="noopener noreferrer">
+      <Message size={20} />
+      {t("common.whatsapp")}
+    </a>
   );
 }

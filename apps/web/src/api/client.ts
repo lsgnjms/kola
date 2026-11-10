@@ -18,6 +18,8 @@ import {
   HistoryResponse,
   httpAuthTemplate,
   PayResponse,
+  RatesResponse,
+  type FiatRates,
   type ApiErrorCode,
 } from "@kola/shared";
 import { sha256 } from "@noble/hashes/sha2.js";
@@ -129,6 +131,18 @@ export class ApiClient {
       return parsed.success ? parsed.data.assistant : "templated";
     } catch {
       return "templated";
+    }
+  }
+
+  /** Indicative local-currency prices. Unsigned and public; empty when the server has none. */
+  async rates(): Promise<FiatRates> {
+    try {
+      const res = await this.fetchFn(`${this.base}/rates`);
+      if (!res.ok) return {};
+      const parsed = RatesResponse.safeParse(await res.json());
+      return parsed.success ? parsed.data.rates : {};
+    } catch {
+      return {};
     }
   }
 
