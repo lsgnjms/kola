@@ -1,0 +1,22 @@
+# Reconnects the regtest Lightning nodes after a reboot (containers get new IPs) and
+# makes sure channels and the demo circle exist. Safe to re-run.
+[Unit]
+Description=Kola regtest stack: start and seed
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=kola
+WorkingDirectory=/opt/kola
+ExecStart=/usr/bin/docker compose -f infra/docker-compose.yml up -d
+ExecStart=/opt/kola/node_modules/.bin/tsx --env-file=.env scripts/seed.ts
+# Stop the nodes cleanly so bitcoind and LND can flush their databases.
+ExecStop=/usr/bin/docker compose -f infra/docker-compose.yml stop
+TimeoutStartSec=15min
+TimeoutStopSec=3min
+
+[Install]
+WantedBy=multi-user.target

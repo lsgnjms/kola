@@ -91,6 +91,28 @@ wallet; with NWC/mainnet we would add a longer passphrase option and key backup.
   testing) exposes only the web dev server to the local network.
 - NIP-98 signatures name the URL the browser used; the API accepts only the
   URLs listed in `PUBLIC_API_URLS`, so a request signed for another host fails.
+- The API trusts `X-Forwarded-For` from `127.0.0.1` only (the local web server),
+  so rate limits apply per visitor. Remote clients can't reach the API directly,
+  so they can't forge that header.
+
+### Hosted demo (`infra/deploy/`, see `docs/deploy.md`)
+
+- Caddy terminates HTTPS and is the only public service (ports 80/443; ufw allows
+  SSH, 80 and 443). The API, LND nodes, bitcoind and relay stay on loopback.
+- Security headers: HSTS, `nosniff`, `Referrer-Policy: no-referrer`, and a strict
+  CSP (`script-src 'self'`, no third-party origins, `frame-ancestors 'none'`).
+- The API runs as an unprivileged `kola` user under systemd sandboxing
+  (`ProtectSystem=strict`, writes only `/opt/kola/data`). `.env` is mode 600.
+  On Linux, `seed` hands each macaroon to that user with mode 600.
+- `DEMO_MODE` publishes the demo people's backup codes, so **anyone can act as
+  Khady, Ousmane or Mariama**. Acceptable for regtest test money only; the
+  daily reset limits the mess. Never enable it with real funds (the API refuses
+  on any network other than regtest).
+- The relay is reachable through `/relay`, so anyone can post events to it.
+  The audit ignores them: it accepts only records signed by the coordinator or by
+  a member listed in the circle definition. Spam could fill the relay's disk;
+  acceptable for a demo, and a production relay would restrict writers.
+- Caddy keeps no access logs (none configured), so visitor IPs are not stored.
 
 ### Outbound: price feed
 
@@ -198,7 +220,7 @@ caps in the API, payout invoices must equal the pot exactly
 | Coordinator rewrites history | Records are signed and checked on each member's device: signatures, payment hashes committed when a round opens, proofs of payment, pot amount, recipient vs rotation, members' own signed joins | Implemented (`auditCircle`) |
 | Relay outage | Durable outbox retries; money never waits on the relay | Implemented |
 | Prompt injection into AI assistant | Read-only tools, no keys/invoices/preimages in context, untrusted-input framing | Pending |
-| Relay tampering | Altered events fail signature checks and are reported | Implemented |
+| Relay tampering or spam | Altered events, events from strangers and joins from outside the rotation are never part of the record: the phone skips them and shows how many it skipped. Verified before de-duplication, so a forged copy cannot hide a genuine event. Inconsistent records from the real signers are flagged | Implemented |
 | Relay censorship | Partly detected: a payout whose contributions are missing is flagged, but a relay or coordinator hiding a whole round is not detectable from one relay. Publishing to several relays is the next step | Partial |
 | Stolen phone | NIP-49 encrypted key, PIN wait-out after 5 tries, auto-lock; spend caps bound the damage of an unlocked phone | Implemented (see limit above) |
 | Swapped request body (e.g. a different invoice) | Client signs sha256 of the exact body; server rejects mismatches | Implemented |

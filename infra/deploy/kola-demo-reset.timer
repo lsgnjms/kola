@@ -1,0 +1,10 @@
+# Daily at 03:00 UTC (night in Dakar and Lagos), so each day starts with a fresh demo.
+[Unit]
+Description=Kola: daily demo reset
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 UTC
+Persistent=false
+
+[Install]
+WantedBy=timers.target

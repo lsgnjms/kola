@@ -1,0 +1,23 @@
+[Unit]
+Description=Kola API
+Requires=kola-seed.service
+After=kola-seed.service
+
+[Service]
+User=kola
+WorkingDirectory=/opt/kola
+ExecStart=/opt/kola/node_modules/.bin/tsx --env-file=.env apps/api/src/index.ts
+Restart=on-failure
+RestartSec=5
+# Hardening: the API only needs to write its database folder.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/kola/data
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

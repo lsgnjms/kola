@@ -55,6 +55,11 @@ export async function buildServer(env: Env, deps: ServerDeps = {}): Promise<Fast
       redact: { paths: REDACT_PATHS, censor: "[redacted]" },
     },
     bodyLimit: 64 * 1024,
+    // The API listens on loopback only; whatever reaches it came through the local web server
+    // (Caddy in production, Vite in dev). Trusting that hop gives each visitor their own rate
+    // limit instead of everyone sharing 127.0.0.1's. Remote clients can't spoof it: they never
+    // talk to the API directly.
+    trustProxy: "127.0.0.1",
   });
 
   // Keep the exact body bytes: NIP-98 signs their hash.

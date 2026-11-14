@@ -1,0 +1,36 @@
+# Kola behind Caddy: automatic HTTPS, static web app, /api and /relay proxied to
+# loopback-only services. KOLA_DOMAIN and KOLA_DIR come from /etc/default/kola.
+{$KOLA_DOMAIN} {
+	encode zstd gzip
+
+	# API: strip the /api prefix (NIP-98 signatures name https://<domain>/api/...).
+	handle_path /api/* {
+		reverse_proxy 127.0.0.1:3000
+	}
+
+	# Public record: phones read the Nostr relay over a WebSocket on the same origin.
+	handle /relay {
+		rewrite * /
+		reverse_proxy 127.0.0.1:7777
+	}
+
+	handle {
+		root * {$KOLA_DIR}/apps/web/dist
+		@hashed path /assets/*
+		header @hashed Cache-Control "public, max-age=31536000, immutable"
+		@fresh path /sw.js /manifest.webmanifest /index.html /
+		header @fresh Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		Permissions-Policy "camera=(self), microphone=(), geolocation=()"
+		# Everything is served from this origin; inline style attributes are used by React.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' wss://{$KOLA_DOMAIN}; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+		-Server
+	}
+}

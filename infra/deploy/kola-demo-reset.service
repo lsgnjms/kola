@@ -1,0 +1,11 @@
+# Puts the shared demo back to "round 1 ready" and frees the spare wallets.
+[Unit]
+Description=Kola: reset the shared demo circle
+
+[Service]
+Type=oneshot
+ExecStart=/bin/systemctl stop kola-api.service
+ExecStart=/usr/bin/runuser -u kola -- /opt/kola/node_modules/.bin/tsx --env-file=/opt/kola/.env /opt/kola/scripts/demo.ts reset
+# Always bring the API back, even if the reset failed.
+ExecStopPost=/bin/systemctl start kola-api.service
+WorkingDirectory=/opt/kola

@@ -139,6 +139,11 @@ function bakeMacaroon(node: string, name: string, uris: string[]): void {
   const path = `/root/.lnd/kola/${name}.macaroon`;
   exec(node, ["sh", "-c", `mkdir -p /root/.lnd/kola && rm -f ${path}`]);
   exec(node, ["lncli", "--network=regtest", "bakemacaroon", `--save_to=${path}`, ...uris.map((u) => `uri:${u}`)]);
+  // On Linux the container writes as root; hand the file to the user running the API (owner-only).
+  // TLS certs are public keys, so they just need to be readable. Docker Desktop doesn't need this.
+  if (process.getuid && process.getgid) {
+    exec(node, ["sh", "-c", `chown ${process.getuid()}:${process.getgid()} ${path} && chmod 600 ${path} && chmod 644 /root/.lnd/tls.cert`]);
+  }
   console.log(`  ${node}/${name}.macaroon: ${uris.length} methods`);
 }
 

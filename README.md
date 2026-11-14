@@ -222,7 +222,7 @@ The full analysis is in **[docs/threat-model.md](docs/threat-model.md)**. Highli
 | **Coordinator** | A trust assumption: it can't take shares while a round is open, but it briefly holds the pot and could refuse service. Documented in the threat model. |
 | **Locked liquidity** | Held payments lock funds along their route until the round is decided, so contribution windows must stay short (2 minutes in the demo, at most 24 hours in production). |
 | **Missed payments** | The whole round is cancelled and refunded. Some groups would prefer to go ahead and record the default instead; this is still an open question for real tontine members. |
-| **Public record** | One relay. Tampering is detected; a relay hiding a whole round is not (multiple relays would fix this). The app learns the coordinator's key from the API. |
+| **Public record** | One relay. Altered or forged records are never accepted (and anyone posting junk to the relay can't spoil the record); a relay hiding a whole round is not (multiple relays would fix this). The app learns the coordinator's key from the API. |
 | **Database** | SQLite is a cache rebuilt from Lightning and the relay. A one-command rebuild is not written yet, and names stay off the relay by design. |
 | **Not built yet** | QR scanning (paste works). |
 | **Local currency** | Indicative only, from CoinGecko (falling back to mempool.space and the fixed euro–FCFA peg). If both are down the app shows sats only. |
