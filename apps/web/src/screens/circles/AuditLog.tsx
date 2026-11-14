@@ -58,6 +58,7 @@ export default function AuditLog({ view }: { view: CircleView }) {
           <span>{t("audit.allGood", { count: result.entries.length })}</span>
         </p>
       )}
+      {result && result.ignored > 0 && <p className="hint">{t("audit.ignored", { count: result.ignored })}</p>}
       {result && result.entries.length > 0 && (
         <ol className="list">
           {result.entries.map((entry) => (

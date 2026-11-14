@@ -95,26 +95,57 @@ describe("auditCircle", () => {
     expect(auditCircle([...all, ...all, other], expected).entries).toHaveLength(all.length);
   });
 
-  it("drops a tampered event and reports it", () => {
+  it("never accepts a tampered event", () => {
     const all = honest();
     const last = all.at(-1);
     if (!last) throw new Error("empty");
     const forged = { ...last, content: last.content.replace('"amountSat":3000', '"amountSat":300') };
     const result = auditCircle([...all.slice(0, -1), forged], expected);
-    expect(result.problems.map((p) => p.code)).toContain("bad_signature");
+    expect(result.ignored).toBe(1);
     expect(result.entries.some((e) => e.event.type === "payout_sent")).toBe(false);
   });
 
-  it("rejects coordinator statements signed by anyone else", () => {
+  it("never accepts coordinator statements signed by anyone else", () => {
     const fake = signed(facts()[1] as CircleEvent, generateSecretKey());
-    expect(codes([...joins(), signed(facts()[0] as CircleEvent), fake])).toContain("wrong_signer");
+    const result = auditCircle([...joins(), signed(facts()[0] as CircleEvent), fake], expected);
+    expect(result.ignored).toBe(1);
+    expect(result.entries.some((e) => e.event.type === "cycle_opened")).toBe(false);
   });
 
   it("rejects a join the member didn't sign: the coordinator can't invent members", () => {
     const forged = signed({ type: "circle_joined", circleId, member: m2, contributionSat: 1000, memberCount: 3 });
-    expect(codes([...joins().slice(0, 2), forged, ...facts().map((f) => signed(f))])).toEqual(
-      expect.arrayContaining(["wrong_signer", "unjoined_member"]),
+    expect(codes([...joins().slice(0, 2), forged, ...facts().map((f) => signed(f))])).toContain("unjoined_member");
+  });
+
+  it("isn't spoiled by junk anyone can post to a public relay", () => {
+    const strangerSk = generateSecretKey();
+    const stranger = getPublicKey(strangerSk);
+    const sneakyJoin = signed(
+      { type: "circle_joined", circleId, member: stranger, contributionSat: 1000, memberCount: 3 },
+      strangerSk,
     );
+    const fakeOpen = signed(facts()[1] as CircleEvent, strangerSk);
+    const garbled = { ...fakeOpen, content: "not json" };
+    const result = auditCircle([...honest(), sneakyJoin, fakeOpen, garbled, { nonsense: true }], expected);
+    expect(result.problems).toEqual([]);
+    expect(result.ignored).toBe(4);
+    expect(result.entries).toHaveLength(honest().length);
+  });
+
+  it("a forgery reusing a genuine event's id can't hide the real one", () => {
+    const all = honest();
+    const last = all.at(-1);
+    if (!last) throw new Error("empty");
+    const forged = { ...last, content: last.content.replace('"amountSat":3000', '"amountSat":300') };
+    const result = auditCircle([forged, ...all], expected);
+    expect(result.problems).toEqual([]);
+    expect(result.entries.some((e) => e.event.type === "payout_sent")).toBe(true);
+  });
+
+  it("still flags garbage signed by the coordinator itself", () => {
+    const { kind, tags, created_at } = signed(facts()[1] as CircleEvent);
+    const garbage = finalizeEvent({ kind, tags, created_at, content: "{}" }, coordinatorSk);
+    expect(codes([...honest(), garbage])).toContain("malformed");
   });
 
   it("catches a preimage that doesn't match its committed hash", () => {
@@ -144,7 +175,7 @@ describe("auditCircle", () => {
   });
 
   it("an empty record has no entries and no complaints", () => {
-    expect(auditCircle([], expected)).toEqual({ entries: [], problems: [] });
+    expect(auditCircle([], expected)).toEqual({ entries: [], problems: [], ignored: 0 });
   });
 });
 

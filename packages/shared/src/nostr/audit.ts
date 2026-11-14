@@ -26,8 +26,6 @@ const RawEvent = z.object({
 });
 
 export type AuditProblemCode =
-  | "bad_signature"
-  | "wrong_signer"
   | "malformed"
   | "no_definition"
   | "unjoined_member"
@@ -54,6 +52,12 @@ export interface AuditResult {
   /** Genuine records, oldest fact first. Events failing a signature check are never included. */
   entries: AuditEntry[];
   problems: AuditProblem[];
+  /**
+   * Events tagged for this circle but not signed by its own signers (bad signature, a stranger's
+   * key, a join from someone outside the rotation). Anyone can post to a public relay, so these
+   * are not part of the record and not a fault in it; the count is shown for transparency.
+   */
+  ignored: number;
 }
 
 /** Order within a round, so verdicts don't depend on `created_at` ties or relay order. */
@@ -75,31 +79,52 @@ export function auditCircle(
   const address = circleAddress(expected.coordinatorPubkey, expected.circleId);
   const seen = new Set<string>();
   const entries: AuditEntry[] = [];
+  let ignored = 0;
 
+  // Pass 1: genuine signatures only. Anything else could have been posted by anyone.
+  const signedEvents: { nostr: Event; event: CircleEvent | null }[] = [];
   for (const item of raw) {
     const parsed = RawEvent.safeParse(item);
     if (!parsed.success) {
-      problems.push({ code: "malformed" });
+      ignored++;
       continue;
     }
     const nostr: Event = parsed.data;
-    if (seen.has(nostr.id)) continue;
-    seen.add(nostr.id);
-    // Not addressed to this circle: someone else's event on a shared relay, not a problem.
+    // Not addressed to this circle: someone else's event on a shared relay, not counted.
     if (!nostr.tags.some((t) => t[0] === "a" && t[1] === address)) continue;
+    // Verify before de-duplicating: a forgery reusing a genuine event's id must not hide the real one.
     if (!verifyEvent(nostr)) {
-      problems.push({ code: "bad_signature", eventId: nostr.id });
+      ignored++;
       continue;
     }
-    const event = parseContent(nostr.content);
+    if (seen.has(nostr.id)) continue;
+    seen.add(nostr.id);
+    signedEvents.push({ nostr, event: parseContent(nostr.content) });
+  }
+
+  // The circle's signers: the coordinator, plus the members its definition lists.
+  let rotation: Set<string> | null = null;
+  for (const { nostr, event } of signedEvents) {
+    if (nostr.pubkey === expected.coordinatorPubkey && event?.type === "circle_defined") {
+      rotation = new Set(event.definition.rotation);
+      break;
+    }
+  }
+  const isCircleSigner = (pubkey: string) => pubkey === expected.coordinatorPubkey || (rotation?.has(pubkey) ?? false);
+
+  // Pass 2: keep what the right party signed.
+  for (const { nostr, event } of signedEvents) {
     if (!event || event.circleId !== expected.circleId || KIND_BY_EVENT[event.type] !== nostr.kind) {
-      problems.push({ code: "malformed", eventId: nostr.id });
+      // Garbage from one of the circle's own signers is worth flagging; from anyone else, it's noise.
+      if (isCircleSigner(nostr.pubkey)) problems.push({ code: "malformed", eventId: nostr.id });
+      else ignored++;
       continue;
     }
     // Members sign their own joins; everything else is the coordinator's statement.
     const signer = event.type === "circle_joined" ? event.member : expected.coordinatorPubkey;
-    if (nostr.pubkey !== signer) {
-      problems.push({ code: "wrong_signer", eventId: nostr.id });
+    const outsider = event.type === "circle_joined" && rotation !== null && !rotation.has(event.member);
+    if (nostr.pubkey !== signer || outsider) {
+      ignored++;
       continue;
     }
     entries.push({ id: nostr.id, createdAtS: nostr.created_at, signer: nostr.pubkey, event });
@@ -113,7 +138,7 @@ export function auditCircle(
       a.createdAtS - b.createdAtS,
   );
   if (entries.length > 0) problems.push(...checkConsistency(entries));
-  return { entries, problems };
+  return { entries, problems, ignored };
 }
 
 function checkConsistency(entries: readonly AuditEntry[]): AuditProblem[] {
