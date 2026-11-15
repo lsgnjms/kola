@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Kola on a fresh Ubuntu 24.04 server (x86_64, 4 vCPU / 8 GB recommended).
+# Kola on a fresh Ubuntu 24.04 server (x86_64, 2 vCPU / 4 GB recommended).
 #
 #   curl -fsSL https://raw.githubusercontent.com/lsgnjms/kola/main/infra/deploy/setup.sh | sudo bash
 #       → https://kola.<your-ip>.sslip.io (no domain needed)

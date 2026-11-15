@@ -6,9 +6,10 @@ touches real bitcoin.
 
 ## What you need
 
-- A server with **Ubuntu 24.04, x86_64, 4 vCPU and 8 GB RAM** (bitcoind, 7 LND nodes,
-  the relay, the API and Caddy). Any provider works: Hetzner CX32, DigitalOcean,
-  Vultr, or a server paid in bitcoin.
+- A server with **Ubuntu 24.04, x86_64, 2 vCPU and 4 GB RAM** (e.g. Hetzner CPX22).
+  Measured after seeding: the whole regtest stack (bitcoind, 7 LND nodes, the relay)
+  uses about 0.4 GB; with the API and Caddy, under 1 GB. Building the web app briefly
+  needs about 1 GB more. 2 GB works but leaves little headroom. Any provider works.
 - SSH access as root (or a user with `sudo`).
 - No domain needed: the script uses `kola.<server-ip>.sslip.io`, which points at
   the server automatically. To use your own domain, point its A record at the
