@@ -6,6 +6,10 @@ Built for the **Dakar Bitcoin Hack 2026 by BTrust**. Open source (MIT). Bitcoin 
 
 [![CI](https://github.com/lsgnjms/kola/actions/workflows/ci.yml/badge.svg)](https://github.com/lsgnjms/kola/actions/workflows/ci.yml)
 
+### ▶ Try it live: **[kola.2-29-207-59.sslip.io](https://kola.2-29-207-59.sslip.io)**
+
+Open it on a phone or laptop and tap **Khady** (demo PIN 123456). Open the *Sandaga market tontine*, tap **Start round 1** and pay. Then switch to **Ousmane** and **Mariama** in *Settings* to pay their shares, and watch the pot arrive. Test money only (a private regtest network). The demo is shared by everyone and resets daily at 03:00 UTC. Add it to your home screen to use it like an app.
+
 <p align="center">
   <img src="docs/screenshots/welcome.png" width="200" alt="Welcome screen with one-tap demo people">
   <img src="docs/screenshots/round-in-progress.png" width="200" alt="A round in progress: two of three paid, countdown running">
