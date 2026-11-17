@@ -22,3 +22,9 @@ infra/data/
 *.sqlite-wal
 *.sqlite-shm
 /data/
+
+# Local working notes and submission material (kept off GitHub)
+plan.md
+CLAUDE.md
+docs/devpost/
+docs/video-script.txt

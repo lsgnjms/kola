@@ -280,8 +280,6 @@ pnpm lint && pnpm typecheck
 
 Optional: put an `ANTHROPIC_API_KEY` in `.env` to let members ask the assistant free-text questions. The quick questions work without it.
 
-Project guidance for contributors and AI assistants is in [CLAUDE.md](CLAUDE.md); scope and timeline are in [plan.md](plan.md).
-
 ## License
 
 [MIT](LICENSE)

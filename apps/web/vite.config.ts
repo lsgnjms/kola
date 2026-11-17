@@ -23,7 +23,7 @@ export default defineConfig({
     },
   },
   build: {
-    // Budget from plan.md: < 300 KB initial JS. Warn well before we get there.
+    // Budget: < 300 KB initial JS. Warn well before we get there.
     chunkSizeWarningLimit: 200,
   },
 });
